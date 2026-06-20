@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v1.3.4 | [`v1.3.4`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.4) | [`9e97a58`](https://github.com/JeongJaeSoon/agent-guard/commit/9e97a58dbfb84faf465db29f33d8686c961d25ec) |
+| v1.3.7 | [`v1.3.7`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.7) | [`de2f255`](https://github.com/JeongJaeSoon/agent-guard/commit/de2f2558d9438b376801f8f3890ccb552d97d830) |
 
 ## Privacy
 
