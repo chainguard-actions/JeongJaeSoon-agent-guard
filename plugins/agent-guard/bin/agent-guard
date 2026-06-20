@@ -1,0 +1,943 @@
+#!/usr/bin/env sh
+set -u
+
+PROGRAM=agent-guard
+VERSION=1.3.4
+
+# Resolve the script's own path, following symlinks. The bootstrap installer
+# drops a symlink at ~/.local/bin/agent-guard that points into ~/.agent-guard/
+# bin/agent-guard, so dirname "$0" alone (without symlink follow) computes the
+# config / scripts directory relative to ~/.local/ instead of ~/.agent-guard/.
+# POSIX-portable: walk the readlink chain by hand (BSD readlink lacks -f).
+script_path() {
+  p=$0
+  hops=0
+  max_hops=40
+  while [ -L "$p" ]; do
+    hops=$((hops + 1))
+    if [ "$hops" -gt "$max_hops" ]; then
+      printf '%s: too many symlink hops while resolving script path: %s\n' "$PROGRAM" "$p" >&2
+      exit 2
+    fi
+    target=$(readlink -- "$p")
+    case "$target" in
+      /*) p=$target ;;
+      *) p="$(dirname -- "$p")/$target" ;;
+    esac
+  done
+  printf '%s\n' "$p"
+}
+
+script_dir() {
+  # shellcheck disable=SC2164
+  CDPATH= cd -- "$(dirname -- "$(script_path)")" && pwd -P
+}
+
+BIN_DIR=$(script_dir)
+ROOT_DIR=$(CDPATH= cd -- "$BIN_DIR/.." && pwd -P)
+
+GITLEAKS_CONFIG=${AGENT_GUARD_GITLEAKS_CONFIG:-"$ROOT_DIR/config/gitleaks.toml"}
+DENY_READ_PATHS=${AGENT_GUARD_DENY_READ_PATHS:-"$ROOT_DIR/config/deny-read-paths.txt"}
+DENY_BASH_PATTERNS=${AGENT_GUARD_DENY_BASH_PATTERNS:-"$ROOT_DIR/config/deny-bash-patterns.txt"}
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  agent-guard hook-pre-tool
+  agent-guard hook-post-tool
+  agent-guard hook-stop
+  agent-guard scan-staged
+  agent-guard scan-working-tree
+  agent-guard scan-path PATH...
+  agent-guard check
+  agent-guard setup [--install --gitleaks-checksum SHA [--gitleaks-version X.Y.Z]]
+  agent-guard smoke-test
+  agent-guard checksum [VERSION]
+  agent-guard version
+EOF
+}
+
+info() {
+  printf '%s\n' "$*" >&2
+}
+
+die() {
+  info "$PROGRAM: $*"
+  exit 2
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+need_gitleaks() {
+  need_cmd gitleaks
+  [ -f "$GITLEAKS_CONFIG" ] || die "gitleaks config not found: $GITLEAKS_CONFIG"
+}
+
+check_deps() {
+  need_cmd sh
+  need_cmd jq
+  need_cmd git
+  need_cmd gitleaks
+  [ -f "$GITLEAKS_CONFIG" ] || die "gitleaks config not found: $GITLEAKS_CONFIG"
+  [ -f "$DENY_READ_PATHS" ] || die "deny read policy not found: $DENY_READ_PATHS"
+  [ -f "$DENY_BASH_PATTERNS" ] || die "deny bash policy not found: $DENY_BASH_PATTERNS"
+  info "$PROGRAM: dependencies ok"
+  gl_version=$(gitleaks version 2>/dev/null | head -1)
+  if [ -n "$gl_version" ]; then
+    info "$PROGRAM: gitleaks $gl_version (>= 8.30 recommended)"
+  fi
+}
+
+GITLEAKS_DEFAULT_VERSION=8.30.1
+SETUP_INSTALL_DIR=${AGENT_GUARD_BIN_DIR:-$HOME/.agent-guard/bin}
+
+setup_status_line() {
+  name=$1
+  if command -v "$name" >/dev/null 2>&1; then
+    ver=$($name --version 2>/dev/null | head -1)
+    if [ -z "$ver" ]; then
+      ver=$($name version 2>/dev/null | head -1)
+    fi
+    info "$PROGRAM: $name  ok  (${ver:-installed})"
+    return 0
+  fi
+  info "$PROGRAM: $name  missing"
+  return 1
+}
+
+setup_suggest_jq_install() {
+  if command -v brew >/dev/null 2>&1; then
+    info "  brew install jq"
+  elif command -v apt-get >/dev/null 2>&1; then
+    info "  sudo apt-get install -y jq"
+  elif command -v dnf >/dev/null 2>&1; then
+    info "  sudo dnf install -y jq"
+  else
+    info "  https://stedolan.github.io/jq/download/"
+  fi
+}
+
+setup_install_gitleaks() {
+  version=$1
+  checksum=$2
+  if [ -z "$checksum" ]; then
+    die "setup: --gitleaks-checksum is required when using --install. Get the published value from https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_checksums.txt"
+  fi
+
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64) arch=x64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *) die "setup: unsupported architecture: $arch" ;;
+  esac
+  case "$os" in
+    darwin|linux) ;;
+    *) die "setup: unsupported os: $os" ;;
+  esac
+
+  need_cmd curl
+  need_cmd shasum
+  need_cmd tar
+
+  archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+  url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/agent-guard-setup.XXXXXX") || die "setup: failed to create temp dir"
+  # POSIX trap chain so caller's traps still run.
+  trap 'rm -rf "$tmp"' EXIT
+
+  info "$PROGRAM: downloading $archive"
+  curl -fsSL "$url" -o "$tmp/$archive" || die "setup: download failed: $url"
+
+  info "$PROGRAM: verifying sha256"
+  printf '%s  %s\n' "$checksum" "$tmp/$archive" | shasum -a 256 -c - >&2 \
+    || die "setup: checksum verification failed for $archive"
+
+  info "$PROGRAM: extracting"
+  tar -xzf "$tmp/$archive" -C "$tmp" || die "setup: extraction failed"
+
+  mkdir -p "$SETUP_INSTALL_DIR" || die "setup: cannot create install dir: $SETUP_INSTALL_DIR"
+  mv "$tmp/gitleaks" "$SETUP_INSTALL_DIR/gitleaks" || die "setup: failed to install gitleaks binary"
+  chmod +x "$SETUP_INSTALL_DIR/gitleaks"
+
+  info "$PROGRAM: installed gitleaks v${version} at $SETUP_INSTALL_DIR/gitleaks"
+  case ":$PATH:" in
+    *":$SETUP_INSTALL_DIR:"*) ;;
+    *)
+      info "$PROGRAM: $SETUP_INSTALL_DIR is not on PATH; add to your shell rc:"
+      info "  export PATH=\"$SETUP_INSTALL_DIR:\$PATH\""
+      ;;
+  esac
+}
+
+do_setup() {
+  install=0
+  version=$GITLEAKS_DEFAULT_VERSION
+  checksum=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --install) install=1 ;;
+      --gitleaks-version)
+        shift
+        [ $# -gt 0 ] || die "setup: --gitleaks-version requires a value"
+        version=$1
+        ;;
+      --gitleaks-version=*) version=${1#--gitleaks-version=} ;;
+      --gitleaks-checksum)
+        shift
+        [ $# -gt 0 ] || die "setup: --gitleaks-checksum requires a value"
+        checksum=$1
+        ;;
+      --gitleaks-checksum=*) checksum=${1#--gitleaks-checksum=} ;;
+      -h|--help)
+        cat >&2 <<'EOF'
+Usage:
+  agent-guard setup
+  agent-guard setup --install --gitleaks-checksum SHA [--gitleaks-version X.Y.Z]
+
+Default behavior is opt-in: setup only reports the dependency status.
+Pass --install to download gitleaks. The checksum is required and must
+match the published value at:
+  https://github.com/gitleaks/gitleaks/releases/download/vX.Y.Z/gitleaks_X.Y.Z_checksums.txt
+EOF
+        return 0
+        ;;
+      *) die "setup: unknown argument: $1" ;;
+    esac
+    shift
+  done
+
+  jq_ok=1; gitleaks_ok=1
+  setup_status_line jq       || jq_ok=0
+  setup_status_line git      || :
+  setup_status_line gitleaks || gitleaks_ok=0
+
+  if [ "$install" -eq 1 ]; then
+    if [ "$gitleaks_ok" -eq 1 ]; then
+      info "$PROGRAM: gitleaks already on PATH; skipping --install"
+    else
+      setup_install_gitleaks "$version" "$checksum"
+    fi
+    if [ "$jq_ok" -eq 0 ]; then
+      info "$PROGRAM: jq is not auto-installed; use your system package manager:"
+      setup_suggest_jq_install
+    fi
+    return 0
+  fi
+
+  if [ "$jq_ok" -eq 0 ] || [ "$gitleaks_ok" -eq 0 ]; then
+    info ""
+    if [ "$jq_ok" -eq 0 ]; then
+      info "$PROGRAM: install jq with your package manager:"
+      setup_suggest_jq_install
+    fi
+    if [ "$gitleaks_ok" -eq 0 ]; then
+      info "$PROGRAM: install gitleaks (rerun with --install to opt in):"
+      info "  agent-guard setup --install \\"
+      info "    --gitleaks-version $GITLEAKS_DEFAULT_VERSION \\"
+      info "    --gitleaks-checksum <sha256-from-published-checksums.txt>"
+      info ""
+      info "$PROGRAM: get the checksum from"
+      info "  https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS_DEFAULT_VERSION/gitleaks_${GITLEAKS_DEFAULT_VERSION}_checksums.txt"
+    fi
+    return 1
+  fi
+
+  info "$PROGRAM: setup ok"
+  return 0
+}
+
+write_private_key_fixture() {
+  path=$1
+  body=AGENT-GUARD-FIXTURE-NEVER-A-REAL-KEY
+  body="${body}-${body}-${body}-${body}"
+  {
+    printf '%s%s\n' '-----BEGIN RSA ' 'PRIVATE KEY-----'
+    printf '%s\n' "$body"
+    printf '%s%s\n' '-----END RSA ' 'PRIVATE KEY-----'
+  } >"$path"
+}
+
+smoke_expect() {
+  expected=$1
+  label=$2
+  shift 2
+  ( "$@" ) >/dev/null 2>&1
+  status=$?
+  if [ "$status" -eq "$expected" ]; then
+    info "$PROGRAM: smoke ok: $label"
+    return 0
+  fi
+  die "smoke failed: $label (expected exit $expected, got $status)"
+}
+
+smoke_test() {
+  check_deps
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/agent-guard-smoke.XXXXXX") || die "smoke: failed to create temp dir"
+  trap 'rm -rf "$tmp"' EXIT INT TERM
+
+  mkdir -p "$tmp/clean" "$tmp/dirty"
+  printf '%s\n' "console.log('ok')" >"$tmp/clean/app.js"
+  write_private_key_fixture "$tmp/dirty/key.pem"
+
+  smoke_expect 0 "scan-path allows a clean directory" scan_path "$tmp/clean"
+  smoke_expect 1 "scan-path blocks a private-key fixture" scan_path "$tmp/dirty"
+
+  printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".env"}}' \
+    | smoke_expect 2 "hook-pre-tool blocks .env reads" hook_pre_tool
+
+  write_payload=$(mktemp_file) || die "smoke: failed to create temp file"
+  {
+    printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"key.pem","content":"'
+    sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' "$tmp/dirty/key.pem" | tr -d '\n'
+    printf '%s\n' '"}}'
+  } >"$write_payload"
+  smoke_expect 2 "hook-pre-tool blocks secret-like writes" hook_pre_tool <"$write_payload"
+  rm -f "$write_payload"
+
+  repo="$tmp/repo"
+  mkdir -p "$repo"
+  (
+    cd "$repo" || exit 2
+    git init -q || exit 2
+    git config user.email test@example.com || exit 2
+    git config user.name "Agent Guard Smoke" || exit 2
+    printf '%s\n' ok >README.md
+    git add README.md || exit 2
+    git commit -q -m init || exit 2
+    mkdir -p githooks
+    {
+      printf '%s\n' '#!/usr/bin/env sh'
+      printf 'exec "%s" scan-staged\n' "$BIN_DIR/agent-guard"
+    } >githooks/pre-commit
+    chmod +x githooks/pre-commit || exit 2
+    git config core.hooksPath githooks || exit 2
+    write_private_key_fixture leak.pem
+    git add leak.pem || exit 2
+    git commit -m leak >/dev/null 2>&1
+    status=$?
+    [ "$status" -ne 0 ] || exit 1
+  ) || die "smoke failed: native pre-commit hook did not block staged fixture"
+  info "$PROGRAM: smoke ok: native pre-commit hook blocks staged fixture"
+  info "$PROGRAM: smoke-test ok"
+}
+
+mktemp_file() {
+  mktemp "${TMPDIR:-/tmp}/agent-guard.XXXXXX" 2>/dev/null || mktemp /tmp/agent-guard.XXXXXX
+}
+
+run_gitleaks_stdin() {
+  label=$1
+  out=$(mktemp_file) || die "failed to create temp file"
+  gitleaks stdin --redact --no-banner --config "$GITLEAKS_CONFIG" --exit-code 1 >"$out" 2>&1
+  status=$?
+  if [ "$status" -eq 0 ]; then
+    rm -f "$out"
+    return 0
+  fi
+  if [ "$status" -eq 1 ]; then
+    info "$PROGRAM: secret-like value detected in $label"
+    sed 's/^/  /' "$out" >&2
+    rm -f "$out"
+    return 1
+  fi
+  info "$PROGRAM: gitleaks failed while scanning $label"
+  sed 's/^/  /' "$out" >&2
+  rm -f "$out"
+  return 2
+}
+
+scan_text_direct() {
+  label=$1
+  text=$2
+  [ -n "$text" ] || return 0
+  printf '%s\n' "$text" | run_gitleaks_stdin "$label"
+}
+
+block_on_scan_status() {
+  status=$1
+  message=$2
+  case "$status" in
+    0) return 0 ;;
+    1) info "$PROGRAM: $message"; exit 2 ;;
+    *) exit 2 ;;
+  esac
+}
+
+extract_added_lines() {
+  awk '
+    /^(diff --git|index|---|\+\+\+|@@) / { next }
+    /^\+/ { sub(/^\+/, ""); print }
+  '
+}
+
+# Extract lines introduced by Codex apply_patch envelopes or unified diffs.
+extract_patch_added_lines() {
+  awk '
+    BEGIN { mode = "none" }
+    /^\*\*\* Begin Patch/ { mode = "none"; next }
+    /^\*\*\* End Patch/ { mode = "none"; next }
+    /^\*\*\* Add File:/ { mode = "add"; next }
+    /^\*\*\* Update File:/ { mode = "update"; next }
+    /^\*\*\* Delete File:/ { mode = "none"; next }
+    /^\*\*\* End of File/ { next }
+    /^@@/ { next }
+    {
+      if (mode == "add") {
+        line = $0
+        sub(/^\+/, "", line)
+        print line
+        next
+      }
+      if (mode == "update") {
+        if (substr($0, 1, 1) == "+") {
+          line = substr($0, 2)
+          print line
+        }
+        next
+      }
+      # Fallback: treat as a unified diff hunk.
+      if (/^\+\+\+ /) next
+      if (/^\+/) {
+        line = $0
+        sub(/^\+/, "", line)
+        print line
+      }
+    }
+  '
+}
+
+inside_git_repo() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+scan_staged() {
+  need_cmd git
+  need_gitleaks
+  inside_git_repo || die "scan-staged must run inside a git work tree"
+  added=$(git diff --cached --unified=0 --no-ext-diff -- . | extract_added_lines)
+  [ -n "$added" ] || return 0
+  scan_text_direct "staged added lines" "$added"
+}
+
+scan_untracked_files() {
+  need_cmd git
+  need_gitleaks
+  list=$(mktemp_file) || die "failed to create temp file"
+  git ls-files --others --exclude-standard >"$list" || {
+    rm -f "$list"
+    die "failed to list untracked files"
+  }
+
+  # Stream every untracked file through a single gitleaks stdin call.
+  # The "### file: <path>" header lets a finding's surrounding context
+  # still indicate which file produced it, while keeping the gitleaks
+  # process count at O(1) instead of O(N) per untracked file.
+  blob=$(mktemp_file) || { rm -f "$list"; die "failed to create temp file"; }
+  any=0
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    [ -f "$path" ] || continue
+    any=1
+    printf '### file: %s\n' "$path" >>"$blob"
+    cat -- "$path" >>"$blob"
+    printf '\n' >>"$blob"
+  done <"$list"
+  rm -f "$list"
+
+  if [ "$any" -eq 0 ]; then
+    rm -f "$blob"
+    return 0
+  fi
+
+  run_gitleaks_stdin "untracked files" <"$blob"
+  status=$?
+  rm -f "$blob"
+  return "$status"
+}
+
+scan_working_tree() {
+  need_cmd git
+  need_gitleaks
+  inside_git_repo || die "scan-working-tree must run inside a git work tree"
+
+  if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    tracked=$(git diff --unified=0 --no-ext-diff HEAD -- . | extract_added_lines)
+  else
+    tracked=$(
+      {
+        git diff --cached --unified=0 --no-ext-diff -- .
+        git diff --unified=0 --no-ext-diff -- .
+      } | extract_added_lines
+    )
+  fi
+
+  result=0
+  if [ -n "$tracked" ]; then
+    scan_text_direct "working tree added lines" "$tracked"
+    status=$?
+    case "$status" in
+      0) ;;
+      1) result=1 ;;
+      *) result=2 ;;
+    esac
+  fi
+
+  scan_untracked_files
+  status=$?
+  case "$status" in
+    0) ;;
+    1) [ "$result" -eq 0 ] && result=1 ;;
+    *) result=2 ;;
+  esac
+
+  return "$result"
+}
+
+scan_path() {
+  need_gitleaks
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  [ "$#" -gt 0 ] || die "scan-path requires at least one path"
+  result=0
+  for path in "$@"; do
+    [ -e "$path" ] || die "path not found: $path"
+    out=$(mktemp_file) || die "failed to create temp file"
+    gitleaks dir "$path" --redact --no-banner --config "$GITLEAKS_CONFIG" --exit-code 1 >"$out" 2>&1
+    status=$?
+    if [ "$status" -eq 0 ]; then
+      rm -f "$out"
+      continue
+    fi
+    if [ "$status" -eq 1 ]; then
+      info "$PROGRAM: secret-like value detected in path: $path"
+      sed 's/^/  /' "$out" >&2
+      [ "$result" -eq 0 ] && result=1
+    else
+      info "$PROGRAM: gitleaks failed while scanning path: $path"
+      sed 's/^/  /' "$out" >&2
+      result=2
+    fi
+    rm -f "$out"
+  done
+  return "$result"
+}
+
+json_value() {
+  expr=$1
+  input=$2
+  printf '%s' "$input" | jq -r "$expr"
+}
+
+normalize_path() {
+  candidate=$1
+  case "$candidate" in
+    file://*) candidate=${candidate#file://} ;;
+  esac
+  case "$candidate" in
+    '~') candidate=${HOME:-/} ;;
+    '~/'*) candidate=${HOME:-/}/${candidate#~/} ;;
+  esac
+  while :; do
+    case "$candidate" in
+      './'*) candidate=${candidate#./} ;;
+      *) break ;;
+    esac
+  done
+  printf '%s' "$candidate"
+}
+
+resolve_path() {
+  candidate=$1
+  # Resolve symlinks when possible; otherwise keep matching the original path.
+  resolved=$(
+    if command -v realpath >/dev/null 2>&1; then
+      realpath -- "$candidate" 2>/dev/null
+    elif command -v readlink >/dev/null 2>&1; then
+      readlink -f -- "$candidate" 2>/dev/null
+    fi
+  )
+  if [ -n "$resolved" ]; then
+    printf '%s' "$resolved"
+  else
+    printf '%s' "$candidate"
+  fi
+}
+
+candidate_matches_deny() {
+  candidate=$1
+  while IFS= read -r pattern || [ -n "$pattern" ]; do
+    case "$pattern" in
+      ''|\#*) continue ;;
+    esac
+    case "$candidate" in
+      $pattern|*/$pattern) return 0 ;;
+    esac
+  done <"$DENY_READ_PATHS"
+  return 1
+}
+
+matches_deny_path() {
+  raw=$1
+  [ -f "$DENY_READ_PATHS" ] || return 1
+
+  normalized=$(normalize_path "$raw")
+  candidate_matches_deny "$normalized" && return 0
+
+  resolved=$(resolve_path "$normalized")
+  if [ "$resolved" != "$normalized" ]; then
+    candidate_matches_deny "$resolved" && return 0
+  fi
+  return 1
+}
+
+check_sensitive_reads() {
+  input=$1
+  need_cmd jq
+  [ -f "$DENY_READ_PATHS" ] || die "deny read policy not found: $DENY_READ_PATHS"
+
+  values=$(printf '%s' "$input" | jq -r '.tool_input // {} | .. | strings')
+  [ -n "$values" ] || return 0
+
+  # Drive the loop from a temp file so it runs in this shell, not a pipeline
+  # sub-shell — that keeps `exit 2` definitive even if a future edit appends
+  # work after the loop.
+  tmp=$(mktemp_file) || die "failed to create temp file"
+  printf '%s\n' "$values" >"$tmp"
+  while IFS= read -r value; do
+    [ -n "$value" ] || continue
+    if matches_deny_path "$value"; then
+      info "$PROGRAM: blocked sensitive file access: $value"
+      rm -f "$tmp"
+      exit 2
+    fi
+  done <"$tmp"
+  rm -f "$tmp"
+}
+
+deny_path_basename_pattern() {
+  # Convert the supported deny-read shell globs to POSIX ERE.
+  pattern=$1
+  py=
+  remaining=$pattern
+  while [ -n "$remaining" ]; do
+    ch=${remaining%"${remaining#?}"}
+    remaining=${remaining#?}
+    case "$ch" in
+      '*') py=${py}'[^[:space:]<>|;&`$()]*' ;;
+      '.'|'^'|'$'|'+'|'?'|'('|')'|'['|']'|'{'|'}'|'|'|'\\') py=${py}'\'${ch} ;;
+      '/') py=${py}'/' ;;
+      *) py=${py}${ch} ;;
+    esac
+  done
+  printf '%s' "$py"
+}
+
+bash_matches_deny_path() {
+  cmd=$1
+  [ -f "$DENY_READ_PATHS" ] || return 1
+  while IFS= read -r entry || [ -n "$entry" ]; do
+    case "$entry" in
+      ''|\#*) continue ;;
+    esac
+    converted=$(deny_path_basename_pattern "$entry")
+    [ -n "$converted" ] || continue
+    # Catch path arguments and shell words without matching substrings like myenv.
+    regex='(^|[^[:alnum:]_./~-])('${converted}'|[^[:space:]<>|;&`$()]*/'${converted}')([^[:alnum:]_.-]|$)'
+    if printf '%s\n' "$cmd" | grep -Eq "$regex"; then
+      return 0
+    fi
+  done <"$DENY_READ_PATHS"
+  return 1
+}
+
+is_shell_command_separator() {
+  case "$1" in
+    ';'|'&&'|'||'|'|') return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+shell_command_words() {
+  printf '%s\n' "$1" | awk '
+    {
+      out = ""
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        n = substr($0, i + 1, 1)
+        if (c == "&" && n == "&") {
+          out = out " && "
+          i++
+          continue
+        }
+        if (c == "|" && n == "|") {
+          out = out " || "
+          i++
+          continue
+        }
+        if (c == ";" || c == "|") {
+          out = out " " c " "
+          continue
+        }
+        out = out c
+      }
+      print out
+    }
+  '
+}
+
+git_option_takes_value() {
+  case "$1" in
+    -c|-C|--git-dir|--work-tree|--namespace|--exec-path|--config-env) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_git_global_option() {
+  case "$1" in
+    -*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_git_commit_or_push() {
+  cmd=$1
+  (
+    set -f
+    words=$(shell_command_words "$cmd")
+    # shellcheck disable=SC2086
+    set -- $words
+
+    command_start=1
+    while [ "$#" -gt 0 ]; do
+      token=$1
+      shift
+
+      if [ "$command_start" -eq 1 ] && [ "$token" = "git" ]; then
+        while [ "$#" -gt 0 ]; do
+          token=$1
+          shift
+          if git_option_takes_value "$token"; then
+            [ "$#" -gt 0 ] && shift
+            continue
+          fi
+          is_git_global_option "$token" && continue
+
+          case "$token" in
+            commit|push)
+              return 0
+              ;;
+            *)
+              break
+              ;;
+          esac
+        done
+        command_start=0
+        continue
+      fi
+
+      if is_shell_command_separator "$token"; then
+        command_start=1
+      else
+        command_start=0
+      fi
+    done
+    return 1
+  )
+}
+
+is_git_hook_bypass() {
+  cmd=$1
+  (
+    set -f
+    words=$(shell_command_words "$cmd")
+    # shellcheck disable=SC2086
+    set -- $words
+
+    while [ "$#" -gt 0 ]; do
+      token=$1
+      shift
+      case "$token" in
+        --no-verify|--no-gpg-sign) return 0 ;;
+      esac
+    done
+    return 1
+  )
+}
+
+check_git_command() {
+  cmd=$1
+  if is_git_commit_or_push "$cmd"; then
+    if is_git_hook_bypass "$cmd"; then
+      info "$PROGRAM: blocked git command that disables hooks/signing"
+      exit 2
+    fi
+    scan_staged
+    block_on_scan_status "$?" "staged changes contain secret-like values; blocking git command"
+  fi
+}
+
+check_bash_command() {
+  input=$1
+  need_cmd jq
+  cmd=$(json_value '.tool_input.command // .tool_input.cmd // empty' "$input")
+  [ -n "$cmd" ] || return 0
+
+  [ -f "$DENY_BASH_PATTERNS" ] || die "deny bash policy not found: $DENY_BASH_PATTERNS"
+  patterns=$(mktemp_file) || die "failed to create temp file"
+  grep -Ev '^[[:space:]]*(#|$)' "$DENY_BASH_PATTERNS" >"$patterns"
+  if [ -s "$patterns" ]; then
+    printf '%s\n' "$cmd" | grep -E -q -f "$patterns"
+    grep_status=$?
+    rm -f "$patterns"
+    case "$grep_status" in
+      0)
+        info "$PROGRAM: blocked risky shell command by deny pattern"
+        exit 2
+        ;;
+      1) ;;
+      *)
+        # grep failed (e.g., invalid ERE in a custom deny file). Fail closed —
+        # silently allowing here would let the rest of the deny list be bypassed.
+        info "$PROGRAM: deny-bash-patterns scan failed; refusing to allow command"
+        exit 2
+        ;;
+    esac
+  else
+    rm -f "$patterns"
+  fi
+
+  if bash_matches_deny_path "$cmd"; then
+    info "$PROGRAM: blocked shell command referencing a deny-listed path"
+    exit 2
+  fi
+
+  check_git_command "$cmd"
+}
+
+scan_mcp_input() {
+  input=$1
+  need_cmd jq
+  text=$(printf '%s' "$input" | jq -c '.tool_input // {}')
+  scan_text_direct "MCP tool input" "$text"
+  block_on_scan_status "$?" "MCP tool input contains secret-like values"
+}
+
+scan_proposed_write() {
+  input=$1
+  tool=$2
+  need_cmd jq
+
+  case "$tool" in
+    Write)
+      content=$(json_value '.tool_input.content // empty' "$input")
+      scan_text_direct "proposed Write content" "$content"
+      block_on_scan_status "$?" "proposed Write contains secret-like values"
+      ;;
+    Edit)
+      content=$(json_value '.tool_input.new_string // empty' "$input")
+      scan_text_direct "proposed Edit content" "$content"
+      block_on_scan_status "$?" "proposed Edit contains secret-like values"
+      ;;
+    MultiEdit)
+      content=$(printf '%s' "$input" | jq -r '[.tool_input.edits[]?.new_string // empty] | join("\n")')
+      scan_text_direct "proposed MultiEdit content" "$content"
+      block_on_scan_status "$?" "proposed MultiEdit contains secret-like values"
+      ;;
+    apply_patch)
+      patch=$(printf '%s' "$input" | jq -r '
+        .tool_input.patch // .tool_input.input // .tool_input.diff // .tool_input.content // empty
+        | if type == "string" then . else tojson end
+      ')
+      added=$(printf '%s\n' "$patch" | extract_patch_added_lines)
+      scan_text_direct "proposed apply_patch added lines" "$added"
+      block_on_scan_status "$?" "proposed apply_patch contains secret-like values"
+      ;;
+  esac
+}
+
+hook_pre_tool() {
+  need_cmd jq
+  input=$(cat)
+  [ -n "$input" ] || return 0
+  tool=$(json_value '.tool_name // .tool // .name // empty' "$input")
+
+  case "$tool" in
+    Write|Edit|MultiEdit|apply_patch)
+      scan_proposed_write "$input" "$tool"
+      ;;
+    Read|NotebookRead|Grep|Glob)
+      check_sensitive_reads "$input"
+      ;;
+    Bash)
+      check_bash_command "$input"
+      ;;
+    mcp__*)
+      scan_mcp_input "$input"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+is_mutation_tool() {
+  case "$1" in
+    Write|Edit|MultiEdit|apply_patch|Bash|mcp__*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+hook_post_tool() {
+  need_cmd jq
+  need_cmd git
+  input=$(cat)
+  [ -n "$input" ] || return 0
+  tool=$(json_value '.tool_name // .tool // .name // empty' "$input")
+  is_mutation_tool "$tool" || return 0
+
+  # Best-effort: silently skip when the agent runs outside a git work tree.
+  inside_git_repo || return 0
+
+  scan_working_tree
+  block_on_scan_status "$?" "changed files contain secret-like values after tool execution"
+}
+
+hook_stop() {
+  need_cmd jq
+  need_cmd git
+  input=$(cat)
+  if [ -n "$input" ]; then
+    active=$(json_value '.stop_hook_active // false' "$input")
+    if [ "$active" = "true" ]; then
+      info "$PROGRAM: stop hook already active; skipping repeat scan to avoid a loop"
+      return 0
+    fi
+  fi
+
+  inside_git_repo || return 0
+
+  scan_working_tree
+  block_on_scan_status "$?" "changed files contain secret-like values before stop"
+}
+
+cmd=${1:-}
+case "$cmd" in
+  hook-pre-tool) hook_pre_tool ;;
+  hook-post-tool) hook_post_tool ;;
+  hook-stop) hook_stop ;;
+  scan-staged) shift; scan_staged "$@" ;;
+  scan-working-tree) shift; scan_working_tree "$@" ;;
+  scan-path) shift; scan_path "$@" ;;
+  check) check_deps ;;
+  setup) shift; do_setup "$@" ;;
+  smoke-test) smoke_test ;;
+  checksum) shift; exec sh "$ROOT_DIR/scripts/gitleaks-checksum.sh" "$@" ;;
+  version) printf '%s %s\n' "$PROGRAM" "$VERSION" ;;
+  ''|-h|--help|help) usage; exit 0 ;;
+  *) usage; exit 2 ;;
+esac

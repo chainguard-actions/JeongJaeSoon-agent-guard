@@ -1,0 +1,43 @@
+name: Test clean scan passes
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Install a mock gitleaks that always exits 0 (no findings)
+      - name: Install mock gitleaks
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cat > "$RUNNER_TEMP/mock-bin/gitleaks" << 'EOF'
+          #!/usr/bin/env sh
+          # Mock gitleaks: always reports clean
+          case "${1:-}" in
+            version) printf 'v8.30.1\n'; exit 0 ;;
+            dir)     exit 0 ;;
+            stdin)   exit 0 ;;
+            *)       exit 0 ;;
+          esac
+          EOF
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create clean scan target
+        run: |
+          mkdir -p /tmp/clean-target
+          echo "console.log('hello world');" > /tmp/clean-target/app.js
+          echo "# README" > /tmp/clean-target/README.md
+
+      - name: Run Agent Guard on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded
+        run: |
+          echo "Action completed successfully on clean directory"
+          echo "PASS"

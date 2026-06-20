@@ -1,1 +1,238 @@
-# JeongJaeSoon-agent-guard
+# Agent Guard
+
+[![Release](https://img.shields.io/github/v/release/JeongJaeSoon/agent-guard)](https://github.com/JeongJaeSoon/agent-guard/releases)
+[![CI](https://github.com/JeongJaeSoon/agent-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/JeongJaeSoon/agent-guard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Deterministic secret-scanning guardrails for Claude Code, Codex, Git hooks, GitHub Actions, and direct CLI scans.
+
+Agent Guard blocks common ways an AI coding agent can accidentally expose secrets: reading `.env`, writing secret-like values, running shell commands that dump credentials, or leaving secrets in the working tree after a tool call. It uses [gitleaks](https://github.com/gitleaks/gitleaks) for detection and plain shell scripts for integration.
+
+It is not a vault, credential rotator, or replacement for GitHub Secret Scanning / Push Protection.
+
+## Pick an install path
+
+| Use case | Install path | Best first check |
+|---|---|---|
+| Claude Code agent guardrails | [Claude Code plugin](#claude-code-plugin) | Ask the agent to read `.env`; it should be blocked. |
+| Codex stable guardrails | [Codex direct CLI + Git hook](#codex-plugin) | Run `agent-guard smoke-test`; commit a staged fixture secret, and it should fail. |
+| Codex experimental plugin hooks | [Codex plugin](#codex-plugin) | Enable `plugin_hooks`, trust hooks in `/hooks`, then ask Codex to read `.env`; it should be blocked. |
+| Local commits | [Native Git hook](#native-git-hook) | Commit a staged fixture secret; commit should fail. |
+| CI / PRs | [GitHub Actions](#github-actions) | Push a test PR with a gitleaks-detectable fixture; workflow should fail. |
+| Manual scans | [Direct CLI](#direct-cli) | Run `agent-guard smoke-test`. |
+
+## Requirements
+
+Agent Guard runs on macOS and Linux and expects:
+
+- `sh`
+- `git`
+- `jq`
+- `gitleaks` 8.30 or newer recommended
+
+With a direct CLI install:
+
+```sh
+agent-guard setup   # prints dependency status and install hints
+agent-guard check   # strict pass/fail dependency check
+agent-guard smoke-test
+```
+
+From a clone of this repo:
+
+```sh
+plugins/agent-guard/bin/agent-guard setup
+make check
+make smoke-test
+```
+
+The Claude Code and Codex plugin installs do not put `agent-guard` on your shell `PATH`; install `jq` and `gitleaks` with your package manager for those paths:
+
+```sh
+brew install jq gitleaks
+```
+
+On Debian / Ubuntu or Fedora, install `jq` with the system package manager and download `gitleaks` from its release page.
+
+## Claude Code Plugin
+
+Install from the marketplace:
+
+```text
+/plugin marketplace add JeongJaeSoon/agent-guard
+/plugin install agent-guard@agent-guard
+/reload-plugins
+```
+
+Smoke test:
+
+```text
+Please read .env
+```
+
+Expected result:
+
+```text
+agent-guard: blocked sensitive file access: .env
+```
+
+Useful Claude Code slash commands:
+
+```text
+/agent-guard:verify
+/agent-guard:checksum [VERSION]
+```
+
+## Codex Plugin
+
+Use the direct CLI plus the native Git hook as the stable Codex path:
+
+```sh
+curl -fsSL https://github.com/JeongJaeSoon/agent-guard/releases/latest/download/bootstrap.sh | sh
+agent-guard scan-working-tree
+~/.agent-guard/install.sh git-hooks
+```
+
+That path gives you on-demand scans and commit-time blocking.
+
+Codex plugin hooks are still behind an under-development Codex feature flag. If you accept that warning and want pre-tool read/write/bash guardrails, enable plugin hooks and install from the marketplace:
+
+```sh
+codex features enable plugin_hooks
+codex plugin marketplace add JeongJaeSoon/agent-guard
+```
+
+Then open `/plugins` in the Codex TUI, install **Agent Guard**, restart Codex, open `/hooks`, and trust the **PreToolUse**, **PostToolUse**, and **Stop** hooks.
+
+Smoke test:
+
+```text
+Please read .env
+```
+
+Expected result:
+
+```text
+agent-guard: blocked sensitive file access: .env
+```
+
+Codex does not currently auto-discover this plugin's `commands/` directory. Ask Codex to run the binary directly when you need those workflows:
+
+```sh
+${CODEX_PLUGIN_ROOT}/bin/agent-guard scan-working-tree
+${CODEX_PLUGIN_ROOT}/bin/agent-guard checksum
+```
+
+## Direct CLI
+
+Install the latest release without cloning:
+
+```sh
+curl -fsSL https://github.com/JeongJaeSoon/agent-guard/releases/latest/download/bootstrap.sh | sh
+```
+
+The installer verifies the release archive checksum, extracts to `~/.agent-guard`, links `agent-guard` into `~/.local/bin`, and runs `agent-guard setup`.
+
+Common commands:
+
+```sh
+agent-guard scan-path .
+agent-guard scan-working-tree
+agent-guard scan-staged
+agent-guard setup
+agent-guard smoke-test
+agent-guard checksum
+```
+
+Override install defaults with `AGENT_GUARD_VERSION`, `AGENT_GUARD_HOME`, or `AGENT_GUARD_BIN_DIR`.
+
+## Native Git Hook
+
+Install from a clone or direct CLI install:
+
+```sh
+cd <your-project>
+~/.agent-guard/install.sh git-hooks
+```
+
+From a clone of this repo:
+
+```sh
+./install.sh git-hooks
+```
+
+This sets `core.hooksPath=githooks` only when it will not overwrite an existing hook setup.
+
+## GitHub Actions
+
+Add a workflow step:
+
+```yaml
+- uses: JeongJaeSoon/agent-guard@v1
+  with:
+    paths: "."
+    gitleaks-checksum: "<sha256 of the gitleaks release archive>"
+```
+
+Use `@v1` for compatible updates, or pin a full tag / commit SHA for stricter reproducibility.
+
+Get the checksum with:
+
+```sh
+agent-guard checksum
+```
+
+CI runners are usually `linux/x64`, so use the `linux/x64` value printed by the checksum command. `require-checksum` defaults to `true`; set it to `false` only for local experimentation.
+
+## What Gets Blocked
+
+- `Read`, `NotebookRead`, `Grep`, and `Glob` access to deny-listed paths such as `.env*`, private keys, `.aws/credentials`, `.npmrc`, and `.pypirc`
+- `Write`, `Edit`, `MultiEdit`, and Codex `apply_patch` content containing secret-like values
+- MCP tool input JSON containing secret-like values
+- risky shell commands such as `printenv`, `op read`, `vault kv get`, `aws secretsmanager get-secret-value`, `cat .env`, and `git commit --no-verify`
+- staged added lines in the native pre-commit hook
+- working-tree added lines and untracked files after agent mutations
+
+Patch and diff scans inspect added lines only. Removing an existing leaked value is allowed.
+
+## Configuration
+
+Override bundled policies with environment variables:
+
+```sh
+AGENT_GUARD_GITLEAKS_CONFIG=/path/to/gitleaks.toml
+AGENT_GUARD_DENY_READ_PATHS=/path/to/deny-read-paths.txt
+AGENT_GUARD_DENY_BASH_PATTERNS=/path/to/deny-bash-patterns.txt
+```
+
+Project-local `.gitleaks.toml` files are not automatically trusted.
+
+## Checksums and Auto-Install
+
+`agent-guard setup --install` can install `gitleaks`, but only with an explicit checksum:
+
+```sh
+agent-guard checksum
+agent-guard setup --install \
+  --gitleaks-version 8.30.1 \
+  --gitleaks-checksum <sha256-for-this-os-and-arch>
+```
+
+The checksum helper prints all supported OS / arch values and paste-ready snippets for CLI setup and GitHub Actions.
+
+## Development
+
+```sh
+make help
+make test
+make smoke-test
+make scan
+make scan-staged
+make checksum
+```
+
+`make smoke-test` uses real `git`, `jq`, and `gitleaks` in temporary projects. `make test` is the faster deterministic routing suite and uses a mock scanner for some cases.
+
+## Privacy
+
+This Action contacts Chainguard's licensing server to verify authorization. Connection metadata (IP address, GitHub repository identifier, timestamp, and any metadata encoded in the auth token) is transmitted to Chainguard, Inc. even if authorization is denied in accordance with our [Privacy Notice](https://www.chainguard.dev/legal/privacy-notice)
