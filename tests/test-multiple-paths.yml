@@ -1,0 +1,43 @@
+name: Test scanning multiple paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pre-install the mock gitleaks so the action skips the download step.
+      # Under act, $GITHUB_WORKSPACE is the action directory itself.
+      - name: Install mock gitleaks
+        run: |
+          MOCK="$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks"
+          if [ ! -f "$MOCK" ]; then
+            # Fallback: try repo-root-relative path (real GitHub Actions runner)
+            MOCK="$GITHUB_WORKSPACE/pristine/JeongJaeSoon--agent-guard/v1.3.7/tests/fixtures/mock-gitleaks"
+          fi
+          sudo cp "$MOCK" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Create two clean directories
+      - name: Create clean test directories
+        run: |
+          mkdir -p /tmp/path-a /tmp/path-b
+          echo "export const greeting = 'hello';" > /tmp/path-a/index.js
+          echo "# Project B" > /tmp/path-b/README.md
+          echo "version = '1.0.0'" > /tmp/path-b/config.toml
+
+      - name: Run Agent Guard on multiple clean paths
+        id: action
+        uses: .
+        with:
+          paths: /tmp/path-a /tmp/path-b
+          require-checksum: "false"
+
+      - name: Assert scan passed for all paths
+        run: |
+          echo "PASS: Agent Guard completed without detecting secrets in multiple clean paths"

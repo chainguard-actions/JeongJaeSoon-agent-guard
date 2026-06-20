@@ -1,0 +1,53 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pre-install the mock gitleaks so the action skips the download step.
+      # Under act, $GITHUB_WORKSPACE is the action directory itself.
+      - name: Install mock gitleaks
+        run: |
+          MOCK="$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks"
+          if [ ! -f "$MOCK" ]; then
+            # Fallback: try repo-root-relative path (real GitHub Actions runner)
+            MOCK="$GITHUB_WORKSPACE/pristine/JeongJaeSoon--agent-guard/v1.3.7/tests/fixtures/mock-gitleaks"
+          fi
+          sudo cp "$MOCK" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Create a minimal custom gitleaks config
+      - name: Create custom gitleaks config
+        run: |
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
+          title = "Custom Agent Guard Config"
+
+          [extend]
+          useDefault = true
+          EOF
+
+      # Create a clean directory to scan
+      - name: Create clean test directory
+        run: |
+          mkdir -p /tmp/clean-custom
+          echo "# Safe content only" > /tmp/clean-custom/README.md
+
+      - name: Run Agent Guard with custom config path
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-custom
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert scan passed with custom config
+        run: |
+          echo "PASS: Agent Guard completed successfully with custom config path"
