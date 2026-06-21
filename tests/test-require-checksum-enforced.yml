@@ -1,0 +1,46 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Remove gitleaks from PATH if present
+        run: |
+          # Remove any existing gitleaks binary so the action must install it
+          if command -v gitleaks > /dev/null 2>&1; then
+            gl_path=$(command -v gitleaks)
+            echo "Found gitleaks at: $gl_path — removing"
+            rm -f "$gl_path"
+          fi
+          # Verify it's gone
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "WARNING: gitleaks still found at $(command -v gitleaks); test may not be reliable"
+          else
+            echo "gitleaks not on PATH — checksum enforcement will be tested"
+          fi
+
+      - name: Run action expecting failure (no checksum, require-checksum=true)
+        id: action
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Assert action failed with checksum error
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when require-checksum=true and no checksum provided"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when checksum was required but not provided"

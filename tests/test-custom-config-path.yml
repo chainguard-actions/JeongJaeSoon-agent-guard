@@ -1,0 +1,33 @@
+name: Test custom config-path input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install mock gitleaks
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          chmod +x /usr/local/bin/gitleaks
+
+      - name: Create clean directory to scan
+        run: |
+          mkdir -p /tmp/custom-config-scan
+          echo "# just a readme" > /tmp/custom-config-scan/README.md
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-scan
+          require-checksum: "false"
+          config-path: "${{ github.workspace }}/plugins/agent-guard/config/gitleaks.toml"
+
+      - name: Assert action succeeded with custom config path
+        run: |
+          echo "Action completed successfully with custom config-path"
+          echo "PASS"

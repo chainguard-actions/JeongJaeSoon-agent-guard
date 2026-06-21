@@ -1,0 +1,33 @@
+name: Test multiple paths scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install mock gitleaks
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          chmod +x /usr/local/bin/gitleaks
+
+      - name: Create multiple clean directories to scan
+        run: |
+          mkdir -p /tmp/scan-dir-a /tmp/scan-dir-b
+          echo "export const greeting = 'hello';" > /tmp/scan-dir-a/index.js
+          echo "version: 1.0.0" > /tmp/scan-dir-b/config.yaml
+
+      - id: action
+        uses: .
+        with:
+          paths: "/tmp/scan-dir-a /tmp/scan-dir-b"
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "Action completed successfully scanning multiple paths"
+          echo "PASS"

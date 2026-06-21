@@ -1,0 +1,33 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install mock gitleaks
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          chmod +x /usr/local/bin/gitleaks
+
+      - name: Create clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan
+          echo "console.log('hello world');" > /tmp/clean-scan/app.js
+          echo "# README" > /tmp/clean-scan/README.md
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan
+          require-checksum: "false"
+
+      - name: Assert action succeeded (clean scan exits 0)
+        run: |
+          echo "Action completed successfully for clean directory"
+          echo "PASS"
