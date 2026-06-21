@@ -1,0 +1,39 @@
+name: Test require-checksum disabled with pre-installed gitleaks
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pre-install the mock gitleaks so the action skips the download step.
+      # Under act, $GITHUB_WORKSPACE is the action directory itself.
+      - name: Install mock gitleaks
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" \
+             "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      # Create a clean directory to scan
+      - name: Create clean scan target
+        run: |
+          mkdir -p /tmp/safe-target
+          echo "export const greeting = 'hello';" > /tmp/safe-target/index.js
+
+      - name: Run Agent Guard with require-checksum disabled
+        id: action
+        uses: .
+        with:
+          paths: /tmp/safe-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded
+        run: |
+          echo "Action completed successfully with require-checksum=false"
+          echo "PASS"
