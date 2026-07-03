@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|Read|NotebookRead|Grep|Glob|Bash|WebFetch|WebSearch|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c '[ -n \"${PLUGIN_ROOT:-}\" ] || { echo \"agent-guard: PLUGIN_ROOT env not set\" >&2; exit 2; }; \"${PLUGIN_ROOT}/bin/agent-guard\" hook-pre-tool'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|Bash|apply_patch|Read|NotebookRead|Grep|Glob|WebFetch|WebSearch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c '[ -n \"${PLUGIN_ROOT:-}\" ] || { echo \"agent-guard: PLUGIN_ROOT env not set\" >&2; exit 2; }; \"${PLUGIN_ROOT}/bin/agent-guard\" hook-post-tool'",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c '[ -n \"${PLUGIN_ROOT:-}\" ] || { echo \"agent-guard: PLUGIN_ROOT env not set\" >&2; exit 2; }; \"${PLUGIN_ROOT}/bin/agent-guard\" hook-stop'",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
