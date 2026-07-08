@@ -1,0 +1,46 @@
+name: Test scanning multiple paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create multiple clean directories to scan
+        run: |
+          mkdir -p /tmp/multi-scan/dir1
+          mkdir -p /tmp/multi-scan/dir2
+          echo "export const greeting = 'hello';" > /tmp/multi-scan/dir1/index.js
+          echo "# Project docs" > /tmp/multi-scan/dir2/README.md
+
+      - name: Run Agent Guard on multiple paths
+        id: action
+        uses: .
+        with:
+          paths: /tmp/multi-scan/dir1 /tmp/multi-scan/dir2
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "Action completed successfully scanning multiple paths"
+          echo "PASS"

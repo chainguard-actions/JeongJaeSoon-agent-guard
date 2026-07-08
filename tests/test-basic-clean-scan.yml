@@ -1,0 +1,46 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan
+          echo "console.log('hello world');" > /tmp/clean-scan/app.js
+          echo "# README" > /tmp/clean-scan/README.md
+          echo "name: my-project" > /tmp/clean-scan/package.json
+
+      - name: Run Agent Guard on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "Action completed successfully - no secrets detected in clean directory"
+          echo "PASS"
