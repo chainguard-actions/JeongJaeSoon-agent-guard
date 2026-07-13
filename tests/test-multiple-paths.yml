@@ -1,0 +1,45 @@
+name: Test multiple paths scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create multiple clean directories to scan
+        run: |
+          mkdir -p /tmp/multi-scan-a
+          mkdir -p /tmp/multi-scan-b
+          echo "const x = 1;" > /tmp/multi-scan-a/index.js
+          echo "# Project B" > /tmp/multi-scan-b/README.md
+          echo "version: 1.0.0" > /tmp/multi-scan-b/config.yaml
+
+      - name: Install gitleaks for the action
+        run: |
+          VERSION=8.30.1
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple clean paths
+        run: |
+          echo "Action completed successfully — no secrets detected in multiple clean directories"
+          echo "PASS"
