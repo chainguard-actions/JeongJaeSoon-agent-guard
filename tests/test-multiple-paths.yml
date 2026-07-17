@@ -1,4 +1,4 @@
-name: Test basic clean directory scan
+name: Test scanning multiple paths
 on:
   workflow_dispatch:
 jobs:
@@ -28,21 +28,23 @@ jobs:
           fi
           gitleaks version
 
-      - name: Create a clean directory to scan
+      - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/clean-scan-target
-          echo "console.log('hello world');" > /tmp/clean-scan-target/app.js
-          echo "# My Project" > /tmp/clean-scan-target/README.md
-          echo "name: my-project" > /tmp/clean-scan-target/package.json
+          mkdir -p /tmp/multi-scan-a
+          mkdir -p /tmp/multi-scan-b
+          echo "export const greet = (name) => 'Hello ' + name;" > /tmp/multi-scan-a/greet.js
+          echo "# Module A" > /tmp/multi-scan-a/README.md
+          echo "def add(a, b): return a + b" > /tmp/multi-scan-b/math.py
+          echo "# Module B" > /tmp/multi-scan-b/README.md
 
-      - name: Run Agent Guard on clean directory
+      - name: Run Agent Guard on multiple clean paths
         id: action
         uses: .
         with:
-          paths: /tmp/clean-scan-target
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
           require-checksum: "false"
 
-      - name: Assert action succeeded (clean scan exits 0)
+      - name: Assert action succeeded for multiple clean paths
         run: |
-          echo "Action completed successfully - no secrets detected in clean directory"
+          echo "Action completed successfully - no secrets detected in multiple clean directories"
           echo "PASS"

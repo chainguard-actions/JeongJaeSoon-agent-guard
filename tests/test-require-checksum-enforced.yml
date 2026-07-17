@@ -7,43 +7,48 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Ensure gitleaks is NOT on PATH (simulate fresh environment)
+      - name: Hide gitleaks from PATH
         run: |
-          # Remove any pre-existing gitleaks from PATH by creating a wrapper
-          # that shadows it with a non-existent binary name check
-          # We verify gitleaks is absent; if it is present we skip this test
+          # Move any installed gitleaks binaries so the action must attempt to install
+          for loc in /usr/local/bin/gitleaks /usr/bin/gitleaks /opt/homebrew/bin/gitleaks "$HOME/.local/bin/gitleaks" "$RUNNER_TEMP/agent-guard-bin/gitleaks"; do
+            if [ -f "$loc" ]; then
+              sudo mv "$loc" "${loc}.hidden" 2>/dev/null || mv "$loc" "${loc}.hidden" 2>/dev/null || true
+              echo "Hid gitleaks at: $loc"
+            fi
+          done
+          # Verify gitleaks is not accessible
           if command -v gitleaks > /dev/null 2>&1; then
-            echo "gitleaks already installed; skipping require-checksum test"
-            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "WARNING: gitleaks still found at $(command -v gitleaks) - test may not work as expected"
           else
-            echo "gitleaks not found; proceeding with require-checksum test"
-            echo "SKIP=false" >> "$GITHUB_ENV"
+            echo "gitleaks successfully hidden from PATH"
           fi
 
-      - name: Run Agent Guard without checksum (expect failure due to require-checksum=true)
+      - name: Run Agent Guard without checksum (expect failure)
         id: action
-        if: env.SKIP == 'false'
         uses: .
         with:
-          paths: "."
+          paths: /tmp
           require-checksum: "true"
           gitleaks-checksum: ""
         continue-on-error: true
 
+      - name: Restore gitleaks if it was hidden
+        if: always()
+        run: |
+          for loc in /usr/local/bin/gitleaks /usr/bin/gitleaks /opt/homebrew/bin/gitleaks "$HOME/.local/bin/gitleaks" "$RUNNER_TEMP/agent-guard-bin/gitleaks"; do
+            if [ -f "${loc}.hidden" ]; then
+              sudo mv "${loc}.hidden" "$loc" 2>/dev/null || mv "${loc}.hidden" "$loc" 2>/dev/null || true
+              echo "Restored gitleaks at: $loc"
+            fi
+          done
+
       - name: Assert action failed due to missing checksum
-        if: env.SKIP == 'false'
         env:
           OUTCOME: ${{ steps.action.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" != "failure" ]; then
-            echo "FAIL: expected action to fail when require-checksum=true and no checksum provided, but outcome was '$OUTCOME'"
+            echo "FAIL: expected action to fail when require-checksum=true and no checksum provided, but outcome was: $OUTCOME"
             exit 1
           fi
           echo "PASS: action correctly failed when checksum was required but not provided"
-
-      - name: Skip notice
-        if: env.SKIP == 'true'
-        run: |
-          echo "Skipped: gitleaks was already installed in this environment"
-          echo "PASS (skipped)"

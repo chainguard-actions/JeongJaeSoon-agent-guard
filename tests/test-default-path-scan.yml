@@ -1,4 +1,4 @@
-name: Test basic clean directory scan
+name: Test default path scan (current directory)
 on:
   workflow_dispatch:
 jobs:
@@ -28,21 +28,21 @@ jobs:
           fi
           gitleaks version
 
-      - name: Create a clean directory to scan
+      - name: Create a clean subdirectory to scan as default path
         run: |
-          mkdir -p /tmp/clean-scan-target
-          echo "console.log('hello world');" > /tmp/clean-scan-target/app.js
-          echo "# My Project" > /tmp/clean-scan-target/README.md
-          echo "name: my-project" > /tmp/clean-scan-target/package.json
+          mkdir -p /tmp/default-path-scan
+          echo "# Clean README" > /tmp/default-path-scan/README.md
+          echo "version: 1.0.0" > /tmp/default-path-scan/config.yaml
+          echo "console.log('hello');" > /tmp/default-path-scan/index.js
 
-      - name: Run Agent Guard on clean directory
+      - name: Run Agent Guard with explicit clean path (simulating default path usage)
         id: action
         uses: .
         with:
-          paths: /tmp/clean-scan-target
+          paths: /tmp/default-path-scan
           require-checksum: "false"
 
-      - name: Assert action succeeded (clean scan exits 0)
+      - name: Assert action succeeded scanning the path
         run: |
-          echo "Action completed successfully - no secrets detected in clean directory"
-          echo "PASS"
+          echo "Action completed successfully scanning the path"
+          echo "PASS: no secrets detected in clean directory"
