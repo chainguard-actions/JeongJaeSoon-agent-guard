@@ -1,0 +1,15 @@
+{
+  "name": "agent-guard",
+  "description": "Real-time secret-leak guardrails for AI coding agents (Claude Code, Codex), Git hooks, and CI.",
+  "owner": {
+    "name": "Agent Guard contributors"
+  },
+  "plugins": [
+    {
+      "name": "agent-guard",
+      "source": "./plugins/agent-guard",
+      "description": "Real-time secret-leak guardrails for AI coding agents (Claude Code, Codex), Git hooks, and CI.",
+      "version": "2.0.0"
+    }
+  ]
+}
