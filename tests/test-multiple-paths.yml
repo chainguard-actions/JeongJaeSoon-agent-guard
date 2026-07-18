@@ -7,44 +7,35 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install gitleaks
+      - name: Pre-install gitleaks
         run: |
           set -euo pipefail
-          if command -v gitleaks > /dev/null 2>&1; then
-            echo "gitleaks already installed: $(gitleaks version)"
-            exit 0
-          fi
-          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          ARCH="$(uname -m)"
-          case "$ARCH" in
-            x86_64|amd64) ARCH="x64" ;;
-            arm64|aarch64) ARCH="arm64" ;;
-          esac
-          VERSION="8.30.1"
-          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
-          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
-          TMP="$(mktemp -d)"
-          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
-          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
-          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          version="8.30.1"
+          os="linux"
+          arch="x64"
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" -o "$tmp/$archive"
+          tar -xzf "$tmp/$archive" -C "$tmp"
+          sudo mv "$tmp/gitleaks" /usr/local/bin/gitleaks
           sudo chmod +x /usr/local/bin/gitleaks
-          echo "Installed gitleaks: $(gitleaks version)"
+          gitleaks version
 
-      - name: Create multiple clean test directories
+      - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/multi-test-a
-          mkdir -p /tmp/multi-test-b
-          echo "export const greeting = 'hello';" > /tmp/multi-test-a/index.js
-          echo "# Project B" > /tmp/multi-test-b/README.md
-          echo "version: 1.0.0" > /tmp/multi-test-b/config.yaml
+          mkdir -p /tmp/multi-scan-a
+          mkdir -p /tmp/multi-scan-b
+          echo "export const greeting = 'hello';" > /tmp/multi-scan-a/index.js
+          echo "package main" > /tmp/multi-scan-b/main.go
 
-      - name: Run Agent Guard on multiple paths
-        id: action
+      - id: action
+        name: Run agent-guard on multiple paths
         uses: .
         with:
-          paths: /tmp/multi-test-a /tmp/multi-test-b
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
           require-checksum: "false"
 
-      - name: Assert scan passed for all paths
+      - name: Assert action succeeded scanning multiple paths
         run: |
-          echo "PASS: scan completed successfully for multiple paths"
+          echo "PASS: action completed successfully scanning multiple clean paths"
