@@ -1,0 +1,28 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal custom gitleaks config and scan target
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/custom-config"
+          printf 'title = "custom-test-config"\n\n[extend]\nuseDefault = true\n' \
+            > "$GITHUB_WORKSPACE/custom-config/gitleaks.toml"
+          mkdir -p "$GITHUB_WORKSPACE/scan-target-custom"
+          echo "console.log('hello');" > "$GITHUB_WORKSPACE/scan-target-custom/app.js"
+
+      - name: Run Agent Guard with custom config
+        id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/scan-target-custom"
+          config-path: "${{ github.workspace }}/custom-config/gitleaks.toml"
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using custom gitleaks config"

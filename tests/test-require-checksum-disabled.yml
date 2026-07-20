@@ -1,0 +1,25 @@
+name: Test require-checksum disabled (false)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/scan-no-checksum"
+          echo "# Safe file" > "$GITHUB_WORKSPACE/scan-no-checksum/README.md"
+          echo "version=1.0.0" > "$GITHUB_WORKSPACE/scan-no-checksum/version.txt"
+
+      - name: Run Agent Guard with require-checksum=false and no checksum
+        id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/scan-no-checksum"
+          require-checksum: "false"
+
+      - name: Assert action succeeded without checksum
+        run: |
+          echo "PASS: action completed successfully with require-checksum=false and no checksum provided"
