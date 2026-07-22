@@ -1,0 +1,53 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION="8.30.1"
+          OS="linux"
+          ARCH="x64"
+          ARCHIVE="gitleaks_${GITLEAKS_VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${ARCHIVE}"
+          TMP=$(mktemp -d)
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create a custom gitleaks config with no rules
+        run: |
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
+          title = "custom-no-rules"
+          # No rules defined — nothing will be flagged
+          EOF
+
+      - name: Create a directory with a secret-like value
+        run: |
+          mkdir -p /tmp/dirty-scan-custom
+          BODY="AGENT-GUARD-FIXTURE-NEVER-A-REAL-KEY"
+          BODY="${BODY}-${BODY}-${BODY}-${BODY}"
+          {
+            printf '%s%s\n' '-----BEGIN RSA ' 'PRIVATE KEY-----'
+            printf '%s\n' "$BODY"
+            printf '%s%s\n' '-----END RSA ' 'PRIVATE KEY-----'
+          } > /tmp/dirty-scan-custom/private-key-fixture.txt
+
+      - name: Run Agent Guard with custom config (no rules — should pass)
+        id: action
+        uses: .
+        with:
+          paths: /tmp/dirty-scan-custom
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using custom config with no rules"
