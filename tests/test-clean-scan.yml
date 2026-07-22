@@ -1,0 +1,25 @@
+name: Test clean path scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan-target
+          echo "console.log('hello world');" > /tmp/clean-scan-target/app.js
+          echo "# README" > /tmp/clean-scan-target/README.md
+
+      - name: Run Agent Guard on clean path
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: action completed without detecting secrets in clean directory"

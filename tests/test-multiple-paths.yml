@@ -9,37 +9,18 @@ jobs:
 
       - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/multi-scan-a
-          mkdir -p /tmp/multi-scan-b
-          echo "const x = 1;" > /tmp/multi-scan-a/index.js
+          mkdir -p /tmp/multi-scan-a /tmp/multi-scan-b
+          echo "export const greet = (name) => 'Hello, ' + name;" > /tmp/multi-scan-a/utils.js
           echo "# Project B" > /tmp/multi-scan-b/README.md
           echo "version: 1.0.0" > /tmp/multi-scan-b/config.yaml
 
-      - name: Install gitleaks for the action
-        run: |
-          VERSION=8.30.1
-          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          ARCH="$(uname -m)"
-          case "$ARCH" in
-            x86_64|amd64) ARCH="x64" ;;
-            arm64|aarch64) ARCH="arm64" ;;
-          esac
-          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
-          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
-          TMP="$(mktemp -d)"
-          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
-          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
-          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
-          sudo chmod +x /usr/local/bin/gitleaks
-          gitleaks version
-
-      - id: action
+      - name: Run Agent Guard on multiple clean paths
+        id: action
         uses: .
         with:
           paths: /tmp/multi-scan-a /tmp/multi-scan-b
           require-checksum: "false"
 
-      - name: Assert action succeeded scanning multiple clean paths
+      - name: Assert action succeeded (no secrets in any path)
         run: |
-          echo "Action completed successfully — no secrets detected in multiple clean directories"
-          echo "PASS"
+          echo "PASS: action completed without detecting secrets across multiple clean directories"

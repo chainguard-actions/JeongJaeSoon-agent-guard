@@ -1,4 +1,4 @@
-name: Test custom config path
+name: Test custom gitleaks config path
 on:
   workflow_dispatch:
 jobs:
@@ -7,47 +7,27 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create a clean directory to scan
+      - name: Create a clean directory and a minimal custom gitleaks config
         run: |
-          mkdir -p /tmp/custom-config-scan-target
-          echo "console.log('hello world');" > /tmp/custom-config-scan-target/app.js
+          mkdir -p /tmp/custom-config-scan
+          echo "# Safe content only" > /tmp/custom-config-scan/notes.txt
+          echo "name: my-project" > /tmp/custom-config-scan/package.json
 
-      - name: Create a custom gitleaks config
-        run: |
-          mkdir -p /tmp/custom-gitleaks-config
-          cat > /tmp/custom-gitleaks-config/gitleaks.toml << 'EOF'
-          title = "custom-test-config"
-
+          # Write a minimal custom gitleaks config that extends the default ruleset
+          cat > /tmp/custom-gitleaks.toml << 'EOF'
+          title = "custom-agent-guard-test"
           [extend]
           useDefault = true
           EOF
 
-      - name: Install gitleaks for the action
-        run: |
-          VERSION=8.30.1
-          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          ARCH="$(uname -m)"
-          case "$ARCH" in
-            x86_64|amd64) ARCH="x64" ;;
-            arm64|aarch64) ARCH="arm64" ;;
-          esac
-          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
-          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
-          TMP="$(mktemp -d)"
-          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
-          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
-          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
-          sudo chmod +x /usr/local/bin/gitleaks
-          gitleaks version
-
-      - id: action
+      - name: Run Agent Guard with explicit custom config path
+        id: action
         uses: .
         with:
-          paths: /tmp/custom-config-scan-target
-          config-path: /tmp/custom-gitleaks-config/gitleaks.toml
+          paths: /tmp/custom-config-scan
+          config-path: /tmp/custom-gitleaks.toml
           require-checksum: "false"
 
       - name: Assert action succeeded with custom config
         run: |
-          echo "Action completed successfully with custom config — no secrets detected"
-          echo "PASS"
+          echo "PASS: action completed successfully using explicit custom config path"

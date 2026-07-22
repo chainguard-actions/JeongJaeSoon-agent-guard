@@ -61,7 +61,7 @@ jobs:
             cur=$(git tag --sort=-version:refname --list 'v[0-9]*.[0-9]*.[0-9]*' \
               | head -n1 | sed 's/^v//')
             : "${cur:=0.0.0}"
-            IFS=. read -r MA MI PA <<< "$cur"
+            IFS=. read -r MA MI PA <<<$"$cur"
             : "${MA:=0}"; : "${MI:=0}"; : "${PA:=0}"
             case "$INPUT_BUMP" in
               major) MA=$((MA+1)); MI=0; PA=0 ;;
@@ -91,9 +91,9 @@ jobs:
           # by reading the manifest version on origin/main. If it equals the
           # target $v, the bump + PR + merge phase was completed by a previous
           # (failed) dispatch and must not be repeated.
-          git fetch origin main > /dev/null
+          git fetch origin main >/dev/null
           main_version=""
-          if git show "origin/main:plugins/agent-guard/.claude-plugin/plugin.json" > /dev/null 2>&1; then
+          if git show "origin/main:plugins/agent-guard/.claude-plugin/plugin.json" >/dev/null 2>&1; then
             main_version=$(git show "origin/main:plugins/agent-guard/.claude-plugin/plugin.json" \
               | jq -r '.version // ""')
           fi
@@ -124,7 +124,7 @@ jobs:
 
           # Does the release object already exist? If yes, assets will be
           # uploaded with --clobber instead of attempting create.
-          if gh release view "v${v}" > /dev/null 2>&1; then
+          if gh release view "v${v}" >/dev/null 2>&1; then
             echo "release_exists=true" >> "$GITHUB_OUTPUT"
             echo "release v${v} already exists; will upload assets with --clobber"
           else
@@ -181,7 +181,7 @@ jobs:
           VER_VERSION: ${{ steps.ver.outputs.version }}
           VER_BRANCH: ${{ steps.ver.outputs.branch }}
           VER_PREVIOUS: ${{ steps.ver.outputs.previous }}
-          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_ACTOR_NAME: ${{ github.actor }}
           INPUT_BUMP: ${{ inputs.bump }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -200,7 +200,7 @@ jobs:
           git push -u origin "$br"
           printf -v body 'Automated release PR for v%s.\n\nTriggered by @%s via workflow_dispatch.\nPrevious tag: %s\nBump: %s\nDry run: %s\n' \
             "$v" \
-            "$GITHUB_ACTOR" \
+            "$GITHUB_ACTOR_NAME" \
             "$VER_PREVIOUS" \
             "$INPUT_BUMP" \
             "$INPUT_DRY_RUN"
@@ -258,7 +258,7 @@ jobs:
           # HEAD. If the tag points elsewhere (manual push at the wrong commit,
           # stale local checkout) we abort instead of silently retagging.
           head_sha=$(git rev-parse HEAD)
-          if git rev-parse --verify --quiet "refs/tags/v${v}" > /dev/null; then
+          if git rev-parse --verify --quiet "refs/tags/v${v}" >/dev/null; then
             tag_sha=$(git rev-parse "v${v}^{}")
             if [ "$tag_sha" = "$head_sha" ]; then
               echo "tag v${v} already at HEAD - skip create"
@@ -293,7 +293,7 @@ jobs:
           # create the release fresh with auto-generated notes. Recheck the
           # state here rather than reusing Detect's output so we don't race a
           # release object that was created between the two steps.
-          if gh release view "v${v}" > /dev/null 2>&1; then
+          if gh release view "v${v}" >/dev/null 2>&1; then
             gh release upload "v${v}" \
               "agent-guard-${v}.tar.gz" \
               "agent-guard-${v}.tar.gz.sha256" \
