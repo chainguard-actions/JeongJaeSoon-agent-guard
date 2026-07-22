@@ -106,6 +106,7 @@ runs:
         if [ -z "${AGENT_GUARD_GITLEAKS_CONFIG:-}" ]; then
           unset AGENT_GUARD_GITLEAKS_CONFIG
         fi
-        # Split paths safely into an array to avoid unquoted expansion and shell injection.
-        IFS=' ' read -ra paths_array <<< "$AGENT_GUARD_PATHS"
+        # Split the space-separated paths into an array so each element is
+        # passed as a separate, properly quoted argument (no glob/word-split).
+        read -ra paths_array <<< "$AGENT_GUARD_PATHS"
         "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- "${paths_array[@]}"

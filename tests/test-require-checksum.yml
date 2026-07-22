@@ -7,32 +7,33 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Remove gitleaks from PATH if present
+      - name: Shadow gitleaks so action must install it
         run: |
-          # Ensure gitleaks is not available so the install step runs
-          if command -v gitleaks > /dev/null 2>&1; then
-            echo "gitleaks found at $(which gitleaks); removing from PATH for this test"
-            # Create a wrapper that shadows gitleaks with a non-existent command
-            mkdir -p /tmp/no-gitleaks-bin
-            echo "PATH without gitleaks: $PATH"
-          fi
+          # Create a directory that will be prepended to PATH.
+          # We do NOT put a gitleaks binary there, so the action's
+          # "command -v gitleaks" check will fail and it will attempt to install.
+          mkdir -p /tmp/shadow-bin
+          # Remove any existing gitleaks from common locations
+          sudo rm -f /usr/local/bin/gitleaks /usr/bin/gitleaks || true
+          # Prepend shadow dir to PATH for subsequent steps
+          echo "/tmp/shadow-bin" >> "$GITHUB_PATH"
 
-      - name: Run Agent Guard without checksum (expect failure)
+      - name: Run Agent Guard without checksum (expect failure due to require-checksum=true)
         id: action
         uses: .
         with:
-          paths: /tmp
+          paths: .
           require-checksum: "true"
           gitleaks-checksum: ""
         continue-on-error: true
 
-      - name: Assert action failed due to missing checksum
+      - name: Assert action failed (missing checksum with require-checksum=true)
         env:
           OUTCOME: ${{ steps.action.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" != "failure" ]; then
-            echo "FAIL: expected action to fail when require-checksum=true and no checksum provided, but outcome was '$OUTCOME'"
+            echo "FAIL: expected action to fail when gitleaks-checksum is empty and require-checksum=true, but got: $OUTCOME"
             exit 1
           fi
-          echo "PASS: action correctly failed when checksum was required but not provided"
+          echo "PASS: Agent Guard correctly enforced checksum requirement"
