@@ -71,10 +71,10 @@ jobs:
             v="${MA}.${MI}.${PA}"
           fi
           safe_v=$(printf '%s' "$v" | tr -d '\n\r')
-          safe_ma=$(printf '%s' "$MA" | tr -d '\n\r')
+          safe_MA=$(printf '%s' "$MA" | tr -d '\n\r')
           safe_cur=$(printf '%s' "$cur" | tr -d '\n\r')
           echo "version=${safe_v}"           >> "$GITHUB_OUTPUT"
-          echo "major=v${safe_ma}"           >> "$GITHUB_OUTPUT"
+          echo "major=v${safe_MA}"           >> "$GITHUB_OUTPUT"
           echo "branch=release/v${safe_v}"   >> "$GITHUB_OUTPUT"
           echo "previous=${safe_cur}"        >> "$GITHUB_OUTPUT"
 
@@ -181,9 +181,9 @@ jobs:
           VER_VERSION: ${{ steps.ver.outputs.version }}
           VER_BRANCH: ${{ steps.ver.outputs.branch }}
           VER_PREVIOUS: ${{ steps.ver.outputs.previous }}
+          GITHUB_ACTOR: ${{ github.actor }}
           INPUT_BUMP: ${{ inputs.bump }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
-          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
           v="$VER_VERSION"

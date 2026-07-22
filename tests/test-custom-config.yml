@@ -1,0 +1,39 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a custom gitleaks config and clean scan target
+        run: |
+          mkdir -p "$RUNNER_TEMP/custom-config"
+          printf '%s\n' \
+            'title = "custom-agent-guard-test"' \
+            '' \
+            '[extend]' \
+            'useDefault = true' \
+            '' \
+            '[[allowlists]]' \
+            'description = "Allow test placeholders"' \
+            'regexes = [' \
+            "  '''(?i)test[_-]?(token|key|secret|password)'''," \
+            ']' \
+            > "$RUNNER_TEMP/custom-config/gitleaks.toml"
+          mkdir -p "$RUNNER_TEMP/custom-scan"
+          echo "# Clean file with no secrets" > "$RUNNER_TEMP/custom-scan/README.md"
+          echo "test_key=not-a-real-secret" > "$RUNNER_TEMP/custom-scan/config.txt"
+
+      - name: Run Agent Guard with custom config on clean path
+        id: action
+        uses: .
+        with:
+          paths: ${{ runner.temp }}/custom-scan
+          config-path: ${{ runner.temp }}/custom-config/gitleaks.toml
+          gitleaks-checksum: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using custom gitleaks config"

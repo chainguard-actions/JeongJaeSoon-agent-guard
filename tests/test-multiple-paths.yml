@@ -4,46 +4,26 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_REF: refs/heads/main
-      GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/multi-scan/dir1
-          mkdir -p /tmp/multi-scan/dir2
-          echo "export const greet = () => 'hello';" > /tmp/multi-scan/dir1/index.js
-          echo "# Module 2" > /tmp/multi-scan/dir2/README.md
-          echo "version: 1.0.0" > /tmp/multi-scan/dir2/config.yaml
+          mkdir -p "$RUNNER_TEMP/multi-scan-a"
+          echo "export const greeting = 'hello';" > "$RUNNER_TEMP/multi-scan-a/index.js"
+          echo "version: 1.0.0" > "$RUNNER_TEMP/multi-scan-a/config.yaml"
 
-      - name: Install gitleaks for the test
-        run: |
-          VERSION=8.30.1
-          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-          ARCH=$(uname -m)
-          case "$ARCH" in
-            x86_64|amd64) ARCH="x64" ;;
-            arm64|aarch64) ARCH="arm64" ;;
-          esac
-          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
-          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
-          TMP=$(mktemp -d)
-          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
-          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
-          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
-          sudo chmod +x /usr/local/bin/gitleaks
-          gitleaks version
+          mkdir -p "$RUNNER_TEMP/multi-scan-b"
+          echo "# Documentation" > "$RUNNER_TEMP/multi-scan-b/README.md"
+          echo "PORT=8080" > "$RUNNER_TEMP/multi-scan-b/settings.txt"
 
-      - id: action
-        name: Run agent-guard on multiple paths
+      - name: Run Agent Guard on multiple clean paths
+        id: action
         uses: .
         with:
-          paths: /tmp/multi-scan/dir1 /tmp/multi-scan/dir2
-          require-checksum: "false"
+          paths: ${{ runner.temp }}/multi-scan-a ${{ runner.temp }}/multi-scan-b
+          gitleaks-checksum: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
 
-      - name: Assert action succeeded for all paths
+      - name: Assert action succeeded scanning multiple paths
         run: |
-          echo "Action completed successfully — no secrets detected in any of the scanned paths"
-          echo "PASS"
+          echo "PASS: action completed successfully scanning multiple clean paths"

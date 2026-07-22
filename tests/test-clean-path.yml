@@ -1,0 +1,26 @@
+name: Test clean path scan (no secrets)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory with no secrets
+        run: |
+          mkdir -p "$RUNNER_TEMP/clean-scan"
+          echo "console.log('hello world');" > "$RUNNER_TEMP/clean-scan/app.js"
+          echo "# My project" > "$RUNNER_TEMP/clean-scan/README.md"
+          echo "PORT=3000" > "$RUNNER_TEMP/clean-scan/config.txt"
+
+      - name: Run Agent Guard on clean path
+        id: action
+        uses: .
+        with:
+          paths: ${{ runner.temp }}/clean-scan
+          gitleaks-checksum: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: action completed without detecting secrets in clean directory"
