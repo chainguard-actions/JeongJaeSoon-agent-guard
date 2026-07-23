@@ -1,0 +1,37 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create a custom gitleaks config and clean scan target
+        run: |
+          mkdir -p /tmp/custom-config
+          printf '%s\n' 'title = "custom-test-config"' > /tmp/custom-config/gitleaks.toml
+          printf '%s\n' '[extend]' >> /tmp/custom-config/gitleaks.toml
+          printf '%s\n' 'useDefault = true' >> /tmp/custom-config/gitleaks.toml
+          mkdir -p /tmp/custom-config-scan-target
+          echo "# Clean file with no secrets" > /tmp/custom-config-scan-target/README.md
+          echo "version=1.0.0" > /tmp/custom-config-scan-target/version.txt
+
+      - name: Run Agent Guard with custom config on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-scan-target
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using custom gitleaks config on clean directory"

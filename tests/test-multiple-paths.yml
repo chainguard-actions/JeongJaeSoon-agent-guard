@@ -1,0 +1,36 @@
+name: Test multiple paths scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create multiple clean directories to scan
+        run: |
+          mkdir -p /tmp/multi-scan-a
+          echo "export const greeting = 'hello';" > /tmp/multi-scan-a/index.js
+          echo "# Module A" > /tmp/multi-scan-a/README.md
+
+          mkdir -p /tmp/multi-scan-b
+          echo "def main(): pass" > /tmp/multi-scan-b/main.py
+          echo "# Module B" > /tmp/multi-scan-b/README.md
+
+      - name: Run Agent Guard on multiple clean paths
+        id: action
+        uses: .
+        with:
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "PASS: action completed successfully scanning multiple clean paths"

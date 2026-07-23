@@ -1,0 +1,33 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan-target
+          echo "console.log('hello world');" > /tmp/clean-scan-target/app.js
+          echo "# My project" > /tmp/clean-scan-target/README.md
+          echo "name=myapp" > /tmp/clean-scan-target/config.txt
+
+      - name: Run Agent Guard on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: action completed without detecting secrets in clean directory"
