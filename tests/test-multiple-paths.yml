@@ -10,7 +10,7 @@ jobs:
       - name: Install gitleaks
         run: |
           set -euo pipefail
-          VERSION="8.30.1"
+          VERSION=8.30.1
           OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
           ARCH="$(uname -m)"
           case "$ARCH" in
@@ -28,19 +28,19 @@ jobs:
 
       - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/multi-scan/dir1
-          mkdir -p /tmp/multi-scan/dir2
-          echo "export const greeting = 'hello';" > /tmp/multi-scan/dir1/index.js
-          echo "# Project docs" > /tmp/multi-scan/dir2/README.md
+          mkdir -p /tmp/multi-scan-dir1
+          mkdir -p /tmp/multi-scan-dir2
+          echo "export const greeting = 'hello';" > /tmp/multi-scan-dir1/index.js
+          echo "# Documentation" > /tmp/multi-scan-dir2/README.md
+          echo "version: 1.0.0" > /tmp/multi-scan-dir2/config.yaml
 
-      - name: Run Agent Guard on multiple paths
+      - name: Run Agent Guard on multiple clean directories
         id: action
         uses: .
         with:
-          paths: /tmp/multi-scan/dir1 /tmp/multi-scan/dir2
+          paths: /tmp/multi-scan-dir1 /tmp/multi-scan-dir2
           require-checksum: "false"
 
-      - name: Assert action succeeded scanning multiple paths
+      - name: Assert action succeeded (no secrets in any path)
         run: |
-          echo "Action completed successfully scanning multiple paths"
-          echo "PASS"
+          echo "PASS: action completed successfully scanning multiple clean directories"

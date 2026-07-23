@@ -1,4 +1,4 @@
-name: Test custom gitleaks config path
+name: Test clean path scan (no secrets)
 on:
   workflow_dispatch:
 jobs:
@@ -26,29 +26,20 @@ jobs:
           sudo chmod +x /usr/local/bin/gitleaks
           gitleaks version
 
-      - name: Create a minimal custom gitleaks config
-        run: |
-          mkdir -p /tmp/custom-config
-          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
-          title = "custom-test-config"
-
-          [extend]
-          useDefault = true
-          EOF
-
       - name: Create a clean directory to scan
         run: |
-          mkdir -p /tmp/custom-config-scan-dir
-          echo "console.log('hello world');" > /tmp/custom-config-scan-dir/app.js
+          mkdir -p /tmp/clean-scan-dir
+          echo "console.log('hello world');" > /tmp/clean-scan-dir/app.js
+          echo "# My project" > /tmp/clean-scan-dir/README.md
+          echo "PORT=3000" > /tmp/clean-scan-dir/.env
 
-      - name: Run Agent Guard with custom config
+      - name: Run Agent Guard on clean directory
         id: action
         uses: .
         with:
-          paths: /tmp/custom-config-scan-dir
-          config-path: /tmp/custom-config/gitleaks.toml
+          paths: /tmp/clean-scan-dir
           require-checksum: "false"
 
-      - name: Assert action succeeded with custom config
+      - name: Assert action succeeded (no secrets found)
         run: |
-          echo "PASS: action completed successfully using a custom gitleaks config"
+          echo "PASS: action completed successfully on clean directory"

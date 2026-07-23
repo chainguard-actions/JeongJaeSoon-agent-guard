@@ -61,7 +61,7 @@ jobs:
             cur=$(git tag --sort=-version:refname --list 'v[0-9]*.[0-9]*.[0-9]*' \
               | head -n1 | sed 's/^v//')
             : "${cur:=0.0.0}"
-            IFS=. read -r MA MI PA <<<"$cur"
+            IFS=. read -r MA MI PA <<< "$cur"
             : "${MA:=0}"; : "${MI:=0}"; : "${PA:=0}"
             case "$INPUT_BUMP" in
               major) MA=$((MA+1)); MI=0; PA=0 ;;
@@ -70,13 +70,10 @@ jobs:
             esac
             v="${MA}.${MI}.${PA}"
           fi
-          safe_v=$(printf '%s' "$v" | tr -d '\n\r')
-          safe_MA=$(printf '%s' "$MA" | tr -d '\n\r')
-          safe_cur=$(printf '%s' "$cur" | tr -d '\n\r')
-          echo "version=${safe_v}"           >> "$GITHUB_OUTPUT"
-          echo "major=v${safe_MA}"           >> "$GITHUB_OUTPUT"
-          echo "branch=release/v${safe_v}"   >> "$GITHUB_OUTPUT"
-          echo "previous=${safe_cur}"        >> "$GITHUB_OUTPUT"
+          echo "version=$v"           >> "$GITHUB_OUTPUT"
+          echo "major=v${MA}"         >> "$GITHUB_OUTPUT"
+          echo "branch=release/v${v}" >> "$GITHUB_OUTPUT"
+          echo "previous=${cur}"      >> "$GITHUB_OUTPUT"
 
       - name: Detect resume state
         id: state
@@ -180,8 +177,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VER_VERSION: ${{ steps.ver.outputs.version }}
           VER_BRANCH: ${{ steps.ver.outputs.branch }}
-          GITHUB_ACTOR_NAME: ${{ github.actor }}
           VER_PREVIOUS: ${{ steps.ver.outputs.previous }}
+          GITHUB_ACTOR: ${{ github.actor }}
           INPUT_BUMP: ${{ inputs.bump }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -200,7 +197,7 @@ jobs:
           git push -u origin "$br"
           printf -v body 'Automated release PR for v%s.\n\nTriggered by @%s via workflow_dispatch.\nPrevious tag: %s\nBump: %s\nDry run: %s\n' \
             "$v" \
-            "$GITHUB_ACTOR_NAME" \
+            "$GITHUB_ACTOR" \
             "$VER_PREVIOUS" \
             "$INPUT_BUMP" \
             "$INPUT_DRY_RUN"
