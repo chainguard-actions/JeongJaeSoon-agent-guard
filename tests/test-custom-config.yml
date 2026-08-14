@@ -1,0 +1,42 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake gitleaks (always clean)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/sh\n# Fake gitleaks: always exits 0 (no secrets found)\nexit 0\n' \
+            > "$HOME/.local/bin/gitleaks"
+          chmod +x "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create a custom gitleaks config and clean directory
+        run: |
+          mkdir -p /tmp/custom-config
+          printf '%s\n' \
+            'title = "custom-test-config"' \
+            '' \
+            '[extend]' \
+            'useDefault = true' \
+            > /tmp/custom-config/gitleaks.toml
+          mkdir -p /tmp/clean-custom
+          echo "# Clean file with no secrets" > /tmp/clean-custom/README.md
+          echo "export TEST_KEY=test-value" > /tmp/clean-custom/config.sh
+
+      - name: Run Agent Guard with custom config
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-custom
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "Action completed successfully with custom config"
+          echo "PASS"

@@ -4,27 +4,31 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Pre-install mock gitleaks
+      - name: Install fake gitleaks (always clean)
         run: |
-          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
-          chmod +x /usr/local/bin/gitleaks
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/sh\n# Fake gitleaks: always exits 0 (no secrets found)\nexit 0\n' \
+            > "$HOME/.local/bin/gitleaks"
+          chmod +x "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Create multiple clean directories to scan
         run: |
-          mkdir -p /tmp/scan-dir-a /tmp/scan-dir-b
-          echo "export const greeting = 'hello';" > /tmp/scan-dir-a/index.js
-          echo "version: 1.0.0" > /tmp/scan-dir-b/config.yaml
+          mkdir -p /tmp/path-a
+          echo "console.log('path a');" > /tmp/path-a/app.js
 
-      - id: action
+          mkdir -p /tmp/path-b
+          echo "# Path B README" > /tmp/path-b/README.md
+          echo "version: 1.0.0" > /tmp/path-b/config.yaml
+
+      - name: Run Agent Guard on multiple paths
+        id: action
         uses: .
         with:
-          paths: "/tmp/scan-dir-a /tmp/scan-dir-b"
+          paths: /tmp/path-a /tmp/path-b
           require-checksum: "false"
 
       - name: Assert action succeeded scanning multiple paths

@@ -4,30 +4,32 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Pre-install mock gitleaks
+      - name: Install fake gitleaks (always clean)
         run: |
-          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
-          chmod +x /usr/local/bin/gitleaks
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/sh\n# Fake gitleaks: always exits 0 (no secrets found)\nexit 0\n' \
+            > "$HOME/.local/bin/gitleaks"
+          chmod +x "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Create clean directory to scan
         run: |
-          mkdir -p /tmp/clean-scan
-          echo "console.log('hello world');" > /tmp/clean-scan/app.js
-          echo "# README" > /tmp/clean-scan/README.md
+          mkdir -p /tmp/clean-dir
+          echo "console.log('hello world');" > /tmp/clean-dir/app.js
+          echo "# README" > /tmp/clean-dir/README.md
+          echo "name: my-app" > /tmp/clean-dir/package.json
 
-      - id: action
+      - name: Run Agent Guard on clean directory
+        id: action
         uses: .
         with:
-          paths: /tmp/clean-scan
+          paths: /tmp/clean-dir
           require-checksum: "false"
 
-      - name: Assert action succeeded (clean scan exits 0)
+      - name: Assert action succeeded (no secrets found)
         run: |
-          echo "Action completed successfully for clean directory"
+          echo "Action completed successfully - no secrets detected in clean directory"
           echo "PASS"
