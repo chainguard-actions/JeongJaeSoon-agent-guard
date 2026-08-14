@@ -4,39 +4,38 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Pre-install the mock gitleaks so the action skips the download step.
-      # Under act, $GITHUB_WORKSPACE is the action directory itself.
-      - name: Install mock gitleaks
+      - name: Install gitleaks for testing
         run: |
-          MOCK="$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks"
-          if [ ! -f "$MOCK" ]; then
-            # Fallback: try repo-root-relative path (real GitHub Actions runner)
-            MOCK="$GITHUB_WORKSPACE/pristine/JeongJaeSoon--agent-guard/v1.3.7/tests/fixtures/mock-gitleaks"
-          fi
-          sudo cp "$MOCK" /usr/local/bin/gitleaks
+          set -euo pipefail
+          version="8.30.1"
+          os="linux"
+          arch="x64"
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" -o "$tmp/$archive"
+          tar -xzf "$tmp/$archive" -C "$tmp"
+          sudo mv "$tmp/gitleaks" /usr/local/bin/gitleaks
           sudo chmod +x /usr/local/bin/gitleaks
           gitleaks version
 
-      # Create a clean directory with no secrets
       - name: Create clean test directory
         run: |
-          mkdir -p /tmp/clean-test
-          echo "console.log('hello world');" > /tmp/clean-test/app.js
-          echo "# README" > /tmp/clean-test/README.md
+          mkdir -p "$GITHUB_WORKSPACE/test-clean"
+          echo "console.log('hello world');" > "$GITHUB_WORKSPACE/test-clean/app.js"
+          echo "# README" > "$GITHUB_WORKSPACE/test-clean/README.md"
+          echo "name: my-app" > "$GITHUB_WORKSPACE/test-clean/package.json"
 
-      - name: Run Agent Guard on clean directory
-        id: action
+      - id: action
         uses: .
         with:
-          paths: /tmp/clean-test
+          paths: "${{ github.workspace }}/test-clean"
           require-checksum: "false"
 
-      - name: Assert scan passed (exit 0 means no secrets found)
+      - name: Assert action succeeded (no secrets found)
         run: |
-          echo "PASS: Agent Guard completed without detecting secrets in clean directory"
+          echo "Action completed successfully - no secrets detected in clean directory"
+          echo "PASS"

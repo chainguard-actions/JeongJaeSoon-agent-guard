@@ -4,50 +4,53 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Pre-install the mock gitleaks so the action skips the download step.
-      # Under act, $GITHUB_WORKSPACE is the action directory itself.
-      - name: Install mock gitleaks
+      - name: Install gitleaks for testing
         run: |
-          MOCK="$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks"
-          if [ ! -f "$MOCK" ]; then
-            # Fallback: try repo-root-relative path (real GitHub Actions runner)
-            MOCK="$GITHUB_WORKSPACE/pristine/JeongJaeSoon--agent-guard/v1.3.7/tests/fixtures/mock-gitleaks"
-          fi
-          sudo cp "$MOCK" /usr/local/bin/gitleaks
+          set -euo pipefail
+          version="8.30.1"
+          os="linux"
+          arch="x64"
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" -o "$tmp/$archive"
+          tar -xzf "$tmp/$archive" -C "$tmp"
+          sudo mv "$tmp/gitleaks" /usr/local/bin/gitleaks
           sudo chmod +x /usr/local/bin/gitleaks
           gitleaks version
 
-      # Create a minimal custom gitleaks config
-      - name: Create custom gitleaks config
+      - name: Create custom gitleaks config and test directory
         run: |
-          mkdir -p /tmp/custom-config
-          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
-          title = "Custom Agent Guard Config"
+          # Create a minimal custom config that extends defaults
+          mkdir -p "$GITHUB_WORKSPACE/test-custom-config"
+          cat > "$GITHUB_WORKSPACE/test-custom-config/gitleaks.toml" << 'EOF'
+          title = "custom-test-config"
 
           [extend]
           useDefault = true
+
+          [[allowlists]]
+          description = "Allow all for testing"
+          regexes = [
+            '''.*'''
+          ]
           EOF
 
-      # Create a clean directory to scan
-      - name: Create clean test directory
-        run: |
-          mkdir -p /tmp/clean-custom
-          echo "# Safe content only" > /tmp/clean-custom/README.md
+          # Create a clean test directory to scan
+          mkdir -p "$GITHUB_WORKSPACE/test-scan-dir"
+          echo "console.log('hello');" > "$GITHUB_WORKSPACE/test-scan-dir/app.js"
 
-      - name: Run Agent Guard with custom config path
-        id: action
+      - id: action
         uses: .
         with:
-          paths: /tmp/clean-custom
-          config-path: /tmp/custom-config/gitleaks.toml
+          paths: "${{ github.workspace }}/test-scan-dir"
+          config-path: "${{ github.workspace }}/test-custom-config/gitleaks.toml"
           require-checksum: "false"
 
-      - name: Assert scan passed with custom config
+      - name: Assert action succeeded with custom config
         run: |
-          echo "PASS: Agent Guard completed successfully with custom config path"
+          echo "Action completed successfully with custom gitleaks config"
+          echo "PASS"
