@@ -1,0 +1,26 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/custom-config-scan
+          echo "# Clean file" > /tmp/custom-config-scan/README.md
+          echo "name=my-app" > /tmp/custom-config-scan/config.properties
+
+      - name: Run Agent Guard with custom config on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-scan
+          config-path: "${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml"
+          require-checksum: "false"
+
+      - name: Assert custom config scan succeeded
+        run: |
+          echo "PASS: custom config scan completed successfully on clean directory"

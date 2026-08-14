@@ -1,0 +1,11 @@
+title = "custom-agent-guard-test"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow all test placeholders"
+regexes = [
+  '''(?i)example[_-]?(token|key|secret|password)''',
+  '''(?i)test[_-]?(token|key|secret|password)'''
+]

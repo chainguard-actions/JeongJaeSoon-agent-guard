@@ -1,40 +1,26 @@
-name: Test basic clean path scan
+name: Test basic clean scan
 on:
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Pre-install the mock gitleaks so the action skips the download step.
-      # Under act, $GITHUB_WORKSPACE is the action directory itself.
-      - name: Install mock gitleaks
+      - name: Create a clean directory to scan
         run: |
-          mkdir -p "$RUNNER_TEMP/mock-bin"
-          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" \
-             "$RUNNER_TEMP/mock-bin/gitleaks"
-          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
-          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+          mkdir -p /tmp/clean-scan-dir
+          echo "console.log('hello world');" > /tmp/clean-scan-dir/app.js
+          echo "# README" > /tmp/clean-scan-dir/README.md
+          echo "name: my-app" > /tmp/clean-scan-dir/package.json
 
-      # Create a clean directory with no secrets
-      - name: Create clean scan target
-        run: |
-          mkdir -p /tmp/clean-target
-          echo "console.log('hello world');" > /tmp/clean-target/app.js
-          echo "# README" > /tmp/clean-target/README.md
-
-      - name: Run Agent Guard on clean path
+      - name: Run Agent Guard on clean directory
         id: action
         uses: .
         with:
-          paths: /tmp/clean-target
+          paths: /tmp/clean-scan-dir
           require-checksum: "false"
 
-      - name: Assert action succeeded (clean scan exits 0)
+      - name: Assert clean scan succeeded
         run: |
-          echo "Action completed successfully — no secrets detected"
-          echo "PASS"
+          echo "PASS: clean directory scan completed without secrets detected"

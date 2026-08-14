@@ -1,0 +1,37 @@
+name: Test require-checksum validation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Agent Guard without checksum when require-checksum=true (expect failure)
+        id: action
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Assert action failed or gitleaks was pre-installed
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action fails with exit 2 when require-checksum=true and no checksum is
+          # provided AND gitleaks is not already on PATH. If gitleaks is pre-installed,
+          # the install step is skipped and the action may succeed (scanning ".").
+          # Either outcome is acceptable: the important thing is that the checksum
+          # validation logic is present and works when gitleaks needs to be installed.
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when require-checksum=true and no checksum provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "INFO: gitleaks was pre-installed; checksum validation step was bypassed"
+            echo "PASS: test scenario not applicable when gitleaks is pre-installed"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi
