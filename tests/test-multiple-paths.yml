@@ -1,4 +1,4 @@
-name: Test multiple paths scan
+name: Test scanning multiple paths
 on:
   workflow_dispatch:
 jobs:
@@ -7,37 +7,23 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Install a mock gitleaks that always exits 0 (no findings)
-      - name: Install mock gitleaks
+      - name: Create multiple clean directories to scan
         run: |
-          mkdir -p "$RUNNER_TEMP/mock-bin"
-          cat > "$RUNNER_TEMP/mock-bin/gitleaks" << 'EOF'
-          #!/usr/bin/env sh
-          # Mock gitleaks: always reports clean
-          case "${1:-}" in
-            version) printf 'v8.30.1\n'; exit 0 ;;
-            dir)     exit 0 ;;
-            stdin)   exit 0 ;;
-            *)       exit 0 ;;
-          esac
-          EOF
-          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
-          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+          mkdir -p /tmp/multi-scan-a
+          echo "export function greet() { return 'hello'; }" > /tmp/multi-scan-a/index.js
+          echo "# Project A" > /tmp/multi-scan-a/README.md
 
-      - name: Create multiple clean scan targets
-        run: |
-          mkdir -p /tmp/path-a /tmp/path-b
-          echo "export const foo = 'bar';" > /tmp/path-a/index.js
-          echo "package main" > /tmp/path-b/main.go
+          mkdir -p /tmp/multi-scan-b
+          echo "def main(): pass" > /tmp/multi-scan-b/main.py
+          echo "# Project B" > /tmp/multi-scan-b/README.md
 
       - name: Run Agent Guard on multiple paths
         id: action
         uses: .
         with:
-          paths: "/tmp/path-a /tmp/path-b"
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
           require-checksum: "false"
 
       - name: Assert action succeeded on multiple paths
         run: |
-          echo "Action completed successfully scanning multiple paths"
-          echo "PASS"
+          echo "PASS: action completed successfully scanning multiple paths"

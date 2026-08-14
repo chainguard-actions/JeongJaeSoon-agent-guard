@@ -1,0 +1,44 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create custom gitleaks config and clean scan directory
+        run: |
+          # Write a minimal custom gitleaks config
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
+          title = "custom-agent-guard-test"
+
+          [extend]
+          useDefault = true
+
+          [[allowlists]]
+          description = "Allow all test fixtures"
+          regexes = [
+            '''(?i)fixture''',
+            '''(?i)test''',
+            '''(?i)example'''
+          ]
+          EOF
+
+          # Create a clean directory to scan
+          mkdir -p /tmp/custom-clean
+          echo "# test project" > /tmp/custom-clean/README.md
+          echo "version: 1.0.0" > /tmp/custom-clean/config.yaml
+
+      - name: Run Agent Guard with custom config on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/custom-clean
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully with custom gitleaks config"

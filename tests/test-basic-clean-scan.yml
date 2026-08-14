@@ -1,0 +1,26 @@
+name: Test basic clean path scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan
+          echo "console.log('hello world');" > /tmp/clean-scan/app.js
+          echo "# README" > /tmp/clean-scan/README.md
+          echo "name: my-app" > /tmp/clean-scan/package.json
+
+      - name: Run Agent Guard on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan
+          require-checksum: "false"
+
+      - name: Assert action succeeded
+        run: |
+          echo "PASS: action completed without error on clean directory"
