@@ -1,0 +1,39 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure gitleaks is NOT on PATH
+        run: |
+          # Verify gitleaks is not pre-installed (so the action tries to install it)
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "gitleaks is already installed at: $(which gitleaks)"
+            echo "Removing it to test the require-checksum enforcement..."
+            sudo rm -f "$(which gitleaks)"
+          fi
+          echo "gitleaks not on PATH - action will attempt to install it"
+
+      - name: Run Agent Guard without checksum (expect failure due to require-checksum=true)
+        id: action
+        uses: .
+        with:
+          paths: "."
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: ""
+          require-checksum: "true"
+        continue-on-error: true
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when require-checksum=true and no checksum provided, but outcome was: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when checksum was required but not provided"

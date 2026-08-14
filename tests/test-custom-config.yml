@@ -1,0 +1,58 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install gitleaks for testing
+        run: |
+          set -euo pipefail
+          version="8.30.1"
+          os="linux"
+          arch="x64"
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" -o "$tmp/$archive"
+          tar -xzf "$tmp/$archive" -C "$tmp"
+          sudo mv "$tmp/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create a custom gitleaks config and a clean scan target
+        run: |
+          # Write a minimal custom gitleaks config
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
+          title = "custom-test-config"
+
+          [extend]
+          useDefault = true
+
+          [[allowlists]]
+          description = "Allow test fixtures"
+          regexes = [
+            '''(?i)test[_-]?(token|key|secret)'''
+          ]
+          EOF
+
+          # Create a clean directory to scan
+          mkdir -p /tmp/custom-config-scan-target
+          echo "# Clean file" > /tmp/custom-config-scan-target/README.md
+          echo "version: 1.0.0" > /tmp/custom-config-scan-target/config.yaml
+
+      - name: Run Agent Guard with custom config on clean directory
+        id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-scan-target
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "Action completed successfully with custom gitleaks config"
+          echo "PASS"
