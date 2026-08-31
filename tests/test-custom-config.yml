@@ -1,0 +1,21 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Agent Guard with custom config
+        id: action
+        uses: .
+        with:
+          paths: "tests"
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+          config-path: "${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: Agent Guard completed with custom gitleaks config"

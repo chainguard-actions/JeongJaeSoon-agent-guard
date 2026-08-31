@@ -1,0 +1,4 @@
+title = "custom-test-config"
+
+[extend]
+useDefault = true

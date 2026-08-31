@@ -1,0 +1,30 @@
+name: Test checksum required fails without checksum
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Agent Guard without checksum (should fail)
+        id: action
+        uses: .
+        with:
+          paths: "."
+          gitleaks-version: "8.30.1"
+          # gitleaks-checksum intentionally omitted
+          # require-checksum defaults to true, so this should fail
+        continue-on-error: true
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is required but not provided"
+          else
+            echo "FAIL: expected action to fail when require-checksum=true and no checksum given, got: $OUTCOME"
+            exit 1
+          fi
