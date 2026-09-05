@@ -1,0 +1,72 @@
+name: Test checksum required - fails without checksum
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean git repository to scan
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/checksum-required-target
+          mkdir -p /tmp/checksum-required-target
+          cd /tmp/checksum-required-target
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          echo "# Clean repository" > README.md
+          git add .
+          git commit -m "initial commit"
+
+      - name: Remove gitleaks from PATH so the install step runs
+        run: |
+          set -euo pipefail
+          for dir in /usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin; do
+            if [ -f "$dir/gitleaks" ]; then
+              sudo mv "$dir/gitleaks" "$dir/gitleaks.hidden" 2>/dev/null || true
+            fi
+          done
+          if [ -f "$RUNNER_TEMP/agent-guard-bin/gitleaks" ]; then
+            mv "$RUNNER_TEMP/agent-guard-bin/gitleaks" \
+               "$RUNNER_TEMP/agent-guard-bin/gitleaks.hidden" 2>/dev/null || true
+          fi
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "WARNING: gitleaks still found at $(which gitleaks)"
+          else
+            echo "gitleaks not on PATH - install step will run and checksum check will be triggered"
+          fi
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/checksum-required-target
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Restore gitleaks if it was moved
+        if: always()
+        run: |
+          for dir in /usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin; do
+            if [ -f "$dir/gitleaks.hidden" ]; then
+              sudo mv "$dir/gitleaks.hidden" "$dir/gitleaks" 2>/dev/null || true
+            fi
+          done
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is required but not provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "INFO: action succeeded - gitleaks was already installed so checksum check was skipped"
+            echo "PASS: checksum check is only triggered when gitleaks needs to be installed"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

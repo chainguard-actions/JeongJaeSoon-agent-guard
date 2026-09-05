@@ -1,0 +1,101 @@
+name: Test scan with pinned gitleaks checksum
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean git repository to scan
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/checksum-scan-target
+          mkdir -p /tmp/checksum-scan-target
+          cd /tmp/checksum-scan-target
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          echo "# Safe file with no secrets" > README.md
+          echo "port: 8080" > server.yaml
+          git add .
+          git commit -m "initial commit"
+
+      - name: Build fake gitleaks archive and install mock curl
+        id: setup
+        run: |
+          set -euo pipefail
+
+          # Create a mock gitleaks binary using printf (no heredoc)
+          FAKE_DIR="$(mktemp -d)"
+          printf '#!/bin/sh\ncase "${1:-}" in\n  version) echo "v8.30.1" ;;\n  detect)  exit 0 ;;\n  *)       exit 0 ;;\nesac\n' > "$FAKE_DIR/gitleaks"
+          chmod +x "$FAKE_DIR/gitleaks"
+
+          # Package it as a tar.gz matching the expected archive name
+          VERSION="8.30.1"
+          ARCHIVE="gitleaks_${VERSION}_linux_x64.tar.gz"
+          ARCHIVE_PATH="/tmp/$ARCHIVE"
+          tar -czf "$ARCHIVE_PATH" -C "$FAKE_DIR" gitleaks
+
+          # Compute sha256 checksum
+          CHECKSUM="$(sha256sum "$ARCHIVE_PATH" | awk '{print $1}')"
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "Fake archive: $ARCHIVE_PATH"
+          echo "Checksum: $CHECKSUM"
+
+          # Install mock curl that serves the fake archive for gitleaks URLs
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          MOCK_CURL="$RUNNER_TEMP/mock-bin/curl"
+
+          # Write the mock curl script using printf (no heredoc)
+          printf '#!/bin/sh\n' > "$MOCK_CURL"
+          printf '# Mock curl: serve fake gitleaks archive for gitleaks download URLs\n' >> "$MOCK_CURL"
+          printf 'out=""\n' >> "$MOCK_CURL"
+          printf 'prev=""\n' >> "$MOCK_CURL"
+          printf 'for arg in "$@"; do\n' >> "$MOCK_CURL"
+          printf '  case "$prev" in\n' >> "$MOCK_CURL"
+          printf '    -o|--output) out="$arg" ;;\n' >> "$MOCK_CURL"
+          printf '  esac\n' >> "$MOCK_CURL"
+          printf '  prev="$arg"\n' >> "$MOCK_CURL"
+          printf 'done\n' >> "$MOCK_CURL"
+          printf 'case "$*" in\n' >> "$MOCK_CURL"
+          printf '  *gitleaks*)\n' >> "$MOCK_CURL"
+          printf '    if [ -n "$out" ]; then\n' >> "$MOCK_CURL"
+          printf '      cp "%s" "$out"\n' "$ARCHIVE_PATH" >> "$MOCK_CURL"
+          printf '    else\n' >> "$MOCK_CURL"
+          printf '      cat "%s"\n' "$ARCHIVE_PATH" >> "$MOCK_CURL"
+          printf '    fi\n' >> "$MOCK_CURL"
+          printf '    exit 0\n' >> "$MOCK_CURL"
+          printf '    ;;\n' >> "$MOCK_CURL"
+          printf 'esac\n' >> "$MOCK_CURL"
+          printf 'exec /usr/bin/curl "$@"\n' >> "$MOCK_CURL"
+          chmod +x "$MOCK_CURL"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Ensure gitleaks is not pre-installed
+        run: |
+          set -euo pipefail
+          for dir in /usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin; do
+            if [ -f "$dir/gitleaks" ]; then
+              sudo mv "$dir/gitleaks" "$dir/gitleaks.bak" 2>/dev/null || true
+            fi
+          done
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "WARNING: gitleaks still found at $(which gitleaks)"
+          else
+            echo "gitleaks not on PATH - action will install it with checksum verification"
+          fi
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/checksum-scan-target
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: ${{ steps.setup.outputs.checksum }}
+          require-checksum: "true"
+
+      - name: Assert action succeeded with checksum verification
+        run: |
+          echo "Action completed successfully with checksum-verified gitleaks install"
+          echo "PASS"

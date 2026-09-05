@@ -1,0 +1,44 @@
+name: Plugin Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-validation:
+    name: Plugin Layout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step after checkout authenticates to Git, so do not persist the
+          # GITHUB_TOKEN in the local git config.
+          persist-credentials: false
+
+      - name: Run tests
+        run: make test
+
+      - name: Validate Codex Plugin Layout
+        run: scripts/validate-plugin-layout.sh --codex
+
+      - name: Validate Claude Plugin Layout
+        run: scripts/validate-plugin-layout.sh --claude
+
+      - name: Validate Plugin Marketplaces
+        run: scripts/validate-plugin-layout.sh --marketplace
+
+      - name: Validate Release Archive Layout
+        run: scripts/validate-plugin-layout.sh --archive
+
+      - name: Validate Marketplace Submission Readiness
+        # Routine PR validation covers stable manifests, disclosure, and the
+        # placeholder template. A concrete catalog SHA is rendered only from
+        # the merged main checkout when an actual submission requests it.
+        run: make submission-check

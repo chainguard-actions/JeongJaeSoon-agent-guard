@@ -1,0 +1,45 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks that reports no findings
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          printf '#!/bin/sh\ncase "${1:-}" in\n  version) echo "v8.30.1" ;;\n  detect)  exit 0 ;;\n  *)       exit 0 ;;\nesac\n' > "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create a clean git repository and custom config
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/custom-config-scan
+          mkdir -p /tmp/custom-config-scan
+          cd /tmp/custom-config-scan
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          echo "# Safe content only" > README.md
+          git add .
+          git commit -m "initial commit"
+
+          printf 'title = "custom-test-config"\n\n[extend]\nuseDefault = true\n' \
+            > /tmp/custom-gitleaks.toml
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-scan
+          config-path: /tmp/custom-gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "Action completed successfully using custom gitleaks config"
+          echo "PASS"
