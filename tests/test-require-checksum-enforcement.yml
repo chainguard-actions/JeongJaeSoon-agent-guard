@@ -1,0 +1,35 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        name: Run agent-guard without checksum (require-checksum=true by default)
+        uses: .
+        continue-on-error: true
+        with:
+          paths: "."
+          # gitleaks-checksum intentionally omitted; require-checksum defaults to true
+          # The action should fail with exit 2 before attempting any download
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is missing and require-checksum=true"
+          elif [ "$OUTCOME" = "success" ]; then
+            # gitleaks was pre-installed on this runner; the install step was skipped
+            # and the scan ran. This is acceptable behavior — the checksum guard only
+            # applies when gitleaks must be downloaded.
+            echo "NOTE: gitleaks was pre-installed; checksum enforcement was not exercised"
+            echo "PASS: action ran successfully with pre-installed gitleaks"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

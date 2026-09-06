@@ -1,0 +1,39 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake gitleaks to avoid network download
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fake-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/fake-gitleaks-clean.sh" "$RUNNER_TEMP/fake-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/fake-bin/gitleaks"
+          echo "$RUNNER_TEMP/fake-bin" >> "$GITHUB_PATH"
+
+      - name: Create a minimal custom gitleaks config and a clean scan target
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/custom-config"
+          printf '%s\n' \
+            'title = "custom-test-config"' \
+            '[extend]' \
+            'useDefault = true' > "$GITHUB_WORKSPACE/custom-config/gitleaks.toml"
+
+          mkdir -p "$GITHUB_WORKSPACE/custom-scan-target"
+          echo "# Safe content only" > "$GITHUB_WORKSPACE/custom-scan-target/README.md"
+
+      - id: action
+        name: Run agent-guard with custom config on clean directory
+        uses: .
+        with:
+          paths: custom-scan-target
+          config-path: "${{ github.workspace }}/custom-config/gitleaks.toml"
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using a custom gitleaks config"
