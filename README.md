@@ -1,32 +1,72 @@
-# JeongJaeSoon/agent-guard
+# Agent Guard
 
-Deterministic secret scanning guardrails for CI
+Agent Guard is a local-first guardrail for Claude Code, Codex, Git hooks,
+GitHub Actions, and direct shell use. It blocks common secret-exposure paths
+before a supported tool runs, redacts supported tool output, and scans changed
+files after mutations. It uses `gitleaks` and portable shell; it has no hosted
+account, telemetry collector, or developer service.
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/JeongJaeSoon/agent-guard](https://github.com/JeongJaeSoon/agent-guard).
+It is a defense-in-depth boundary. Keep GitHub Secret Scanning, Push
+Protection, review, and normal credential management in place. Agent Guard is
+not a vault, DLP system, EDR, or credential rotator.
 
-## Versions
+![Agent Guard blocking an agent's read of a .env that holds a private key, then a scan flagging the leak](docs/demo.gif)
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.10.0 | [`v1.10.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.10.0) | [`76072b4`](https://github.com/JeongJaeSoon/agent-guard/commit/76072b432c8a38cd739118b2e2909ebe796122c5) |
-| v1.10.1 | [`v1.10.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.10.1) | [`a795c72`](https://github.com/JeongJaeSoon/agent-guard/commit/a795c72e0c9a58ce8a5d0eee5e92423f3cf3e4e1) |
-| v1.3.4 | [`v1.3.4`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.4) | [`9e97a58`](https://github.com/JeongJaeSoon/agent-guard/commit/9e97a58dbfb84faf465db29f33d8686c961d25ec) |
-| v1.3.5 | [`v1.3.5`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.5) | [`acbf845`](https://github.com/JeongJaeSoon/agent-guard/commit/acbf845fc9d65ae8834d82d1ac7c6ed531f2aed2) |
-| v1.3.6 | [`v1.3.6`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.6) | [`59d552a`](https://github.com/JeongJaeSoon/agent-guard/commit/59d552a4642b691faab03982e90d2c2af831e869) |
-| v1.3.7 | [`v1.3.7`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.7) | [`de2f255`](https://github.com/JeongJaeSoon/agent-guard/commit/de2f2558d9438b376801f8f3890ccb552d97d830) |
-| v1.3.8 | [`v1.3.8`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.8) | [`70a86fc`](https://github.com/JeongJaeSoon/agent-guard/commit/70a86fce436ea0ccb7741f0e1ceda1c41b2b6ecc) |
-| v1.5.0 | [`v1.5.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.5.0) | [`b56ac9e`](https://github.com/JeongJaeSoon/agent-guard/commit/b56ac9e06220373821c1237b2b649c161c48e7b8) |
-| v1.7.0 | [`v1.7.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.7.0) | [`3f1ff29`](https://github.com/JeongJaeSoon/agent-guard/commit/3f1ff299a935c05e1dcd90493f16fdb602ff00a8) |
-| v1.7.1 | [`v1.7.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.7.1) | [`955c270`](https://github.com/JeongJaeSoon/agent-guard/commit/955c2703ad0f9e86a97c598625d455036506f986) |
-| v1.8.0 | [`v1.8.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.8.0) | [`5d1a064`](https://github.com/JeongJaeSoon/agent-guard/commit/5d1a064e1587ef43b76fa642a1b4038d802f79d3) |
-| v1.9.0 | [`v1.9.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.9.0) | [`ed5c32b`](https://github.com/JeongJaeSoon/agent-guard/commit/ed5c32b93dfa7fa55e3da941e7e1b6028df51a8b) |
-| v2.0.0 | [`v2.0.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v2.0.0) | [`65008a9`](https://github.com/JeongJaeSoon/agent-guard/commit/65008a97b3584f70872b01ba68824ff63ca93df6) |
-| v2.0.1 | [`v2.0.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v2.0.1) | [`967b174`](https://github.com/JeongJaeSoon/agent-guard/commit/967b174c64a6d280ab4d55cc9ce78b11e62cef4b) |
-| v3.0.1 | [`v3.0.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.0.1) | [`6fccc4a`](https://github.com/JeongJaeSoon/agent-guard/commit/6fccc4a2428ac08bc4d4ef5b6fc2632b48a18a20) |
-| v3.1.0 | [`v3.1.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.1.0) | [`98726f2`](https://github.com/JeongJaeSoon/agent-guard/commit/98726f2244e6ab0dd67d8a29aee8d3e742edd387) |
-| v3.1.1 | [`v3.1.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.1.1) | [`b1d168e`](https://github.com/JeongJaeSoon/agent-guard/commit/b1d168e4725555378f6cfa5a28cd51858562271d) |
-| v3.2.0 | [`v3.2.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.2.0) | [`75b16e6`](https://github.com/JeongJaeSoon/agent-guard/commit/75b16e6fdada301c80d883ea94347afd5c6d7623) |
-| v3.3.0 | [`v3.3.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.3.0) | [`e6314ec`](https://github.com/JeongJaeSoon/agent-guard/commit/e6314ec7fc91596dbed75499e3c390c8432e0ff8) |
+## Choose your path
+
+| I need to… | Start here |
+| --- | --- |
+| Install a Claude Code or Codex plugin, CLI, Git hook, or Action | [Installation](docs/installation.md) |
+| Understand host coverage and configure an integration | [Integrations](docs/integrations.md) |
+| Verify a setup and understand what the result proves | [Verification](docs/verification.md) |
+| Configure policy, PII, redaction, or infrastructure behavior | [Configuration](docs/configuration.md) |
+| Run a small internal pilot | [Pilot manual (Korean)](docs/pilot.md) |
+| Deploy for a managed team or troubleshoot an environment | [Operations](docs/operations.md) |
+
+## Quick use
+
+After installing a plugin, run its guided setup:
+
+```text
+# Claude Code
+/agent-guard:setup-agent-guard
+
+# Codex
+$setup-agent-guard
+```
+
+The setup flow checks local dependencies and runs synthetic checks. It does not
+prove that your current host tool route dispatches hooks; complete the harmless
+live probes in [Verification](docs/verification.md) before relying on a plugin
+boundary.
+
+For a direct repository check:
+
+```sh
+agent-guard scan-working-tree
+agent-guard scan-staged
+agent-guard scan-path .
+```
+
+## Requirements and scope
+
+Supported platforms are macOS and Linux on x64 and arm64. Runtime dependencies
+are `sh`, `awk`, `git`, `jq`, and gitleaks 8.30 or newer. Windows is not
+currently supported.
+
+Default processing is local and ephemeral. Read [Privacy](PRIVACY.md) before
+enabling an endpoint-backed PII provider. Read [Security](SECURITY.md) for
+responsible disclosure and [Support](SUPPORT.md) for safe reports.
+
+## Project documents
+
+- [Privacy and data handling](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Changelog](CHANGELOG.md)
+- [Known limitations](docs/integrations.md#limits-and-backstops)
+- [Maintainer release handoff](docs/releases.md)
 
 ## Privacy
 

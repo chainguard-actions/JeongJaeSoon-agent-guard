@@ -1,0 +1,41 @@
+name: Test scanning multiple paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create multiple clean directories to scan
+        run: |
+          # Create first clean directory
+          mkdir -p /tmp/multi-scan-a
+          echo "# Project A" > /tmp/multi-scan-a/README.md
+          cd /tmp/multi-scan-a
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add .
+          git commit -m "Initial commit"
+
+          # Create second clean directory
+          mkdir -p /tmp/multi-scan-b
+          echo "# Project B" > /tmp/multi-scan-b/README.md
+          cd /tmp/multi-scan-b
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add .
+          git commit -m "Initial commit"
+
+      - id: action
+        name: Run agent-guard on multiple paths
+        uses: .
+        with:
+          paths: /tmp/multi-scan-a /tmp/multi-scan-b
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "PASS: agent-guard successfully scanned multiple paths without finding secrets"

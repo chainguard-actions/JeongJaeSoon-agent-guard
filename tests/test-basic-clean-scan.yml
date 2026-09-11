@@ -1,0 +1,33 @@
+name: Test basic clean scan (no secrets)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan-target
+          echo "# Hello World" > /tmp/clean-scan-target/README.md
+          echo "name: my-project" > /tmp/clean-scan-target/config.yaml
+          echo "version: 1.0.0" >> /tmp/clean-scan-target/config.yaml
+          # Initialize a git repo so gitleaks can scan it
+          cd /tmp/clean-scan-target
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add .
+          git commit -m "Initial commit"
+
+      - id: action
+        name: Run agent-guard on clean directory
+        uses: .
+        with:
+          paths: /tmp/clean-scan-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: agent-guard completed without finding secrets in clean directory"
