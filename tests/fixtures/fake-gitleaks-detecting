@@ -1,0 +1,75 @@
+#!/bin/sh
+# Fake gitleaks that detects secrets in files containing AGENT_GUARD_TEST_SECRET.
+# Handles the calling conventions used by agent-guard.
+set -u
+
+mode="${1:-}"
+case "$mode" in
+  version)
+    printf '8.30.1-fake\n'
+    exit 0
+    ;;
+  dir)
+    # agent-guard calls: gitleaks dir <path> [--report-path=...] [--config=...] [...]
+    # Scan positional args for directories/files containing secrets
+    shift
+    for arg in "$@"; do
+      case "$arg" in
+        -*) continue ;;
+        *)
+          if [ -f "$arg" ] && grep -qE 'AGENT_GUARD_TEST_SECRET' "$arg" 2>/dev/null; then
+            printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+            exit 1
+          fi
+          if [ -d "$arg" ] && grep -rqE 'AGENT_GUARD_TEST_SECRET' "$arg" 2>/dev/null; then
+            printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+            exit 1
+          fi
+          ;;
+      esac
+    done
+    exit 0
+    ;;
+  detect)
+    # Some versions call detect instead of dir
+    shift
+    for arg in "$@"; do
+      case "$arg" in
+        --source=*)
+          src="${arg#--source=}"
+          if [ -d "$src" ] && grep -rqE 'AGENT_GUARD_TEST_SECRET' "$src" 2>/dev/null; then
+            printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+            exit 1
+          fi
+          ;;
+        -*) continue ;;
+        *)
+          if [ -f "$arg" ] && grep -qE 'AGENT_GUARD_TEST_SECRET' "$arg" 2>/dev/null; then
+            printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+            exit 1
+          fi
+          if [ -d "$arg" ] && grep -rqE 'AGENT_GUARD_TEST_SECRET' "$arg" 2>/dev/null; then
+            printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+            exit 1
+          fi
+          ;;
+      esac
+    done
+    exit 0
+    ;;
+  stdin)
+    input=$(cat)
+    case "$input" in
+      *AGENT_GUARD_TEST_SECRET*)
+        printf 'Finding: AGENT_GUARD_TEST_SECRET detected\n'
+        exit 1
+        ;;
+      *)
+        exit 0
+        ;;
+    esac
+    ;;
+  *)
+    exit 0
+    ;;
+esac

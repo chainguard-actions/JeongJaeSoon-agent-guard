@@ -1,0 +1,31 @@
+name: Test basic scan (no secrets)
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake gitleaks on PATH so the action skips the download step
+        run: |
+          set -euo pipefail
+          # Copy the committed fake gitleaks fixture to a PATH location
+          cp "$GITHUB_WORKSPACE/tests/fixtures/fake-gitleaks-clean" /usr/local/bin/gitleaks
+          chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Run Agent Guard scan on the repository
+        id: scan
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "false"
+        env:
+          # Override gitleaks binary so agent-guard uses our fake instead of PATH lookup
+          AGENT_GUARD_GITLEAKS_BIN: "${{ github.workspace }}/tests/fixtures/fake-gitleaks-clean"
+
+      - name: Assert scan completed successfully
+        run: |
+          echo "PASS: Agent Guard scan completed without detecting secrets"

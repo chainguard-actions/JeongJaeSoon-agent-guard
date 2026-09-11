@@ -1,0 +1,30 @@
+#!/bin/sh
+# Fake gitleaks that always reports a clean scan (no secrets found).
+# Handles the calling conventions used by agent-guard.
+set -u
+
+mode="${1:-}"
+case "$mode" in
+  version)
+    printf '8.30.1-fake\n'
+    exit 0
+    ;;
+  dir)
+    # agent-guard calls: gitleaks dir <path> [--report-path=...] [--config=...] [...]
+    # Return 0 = clean
+    exit 0
+    ;;
+  detect)
+    # Some versions call detect instead of dir
+    exit 0
+    ;;
+  stdin)
+    # Drain stdin and return clean
+    cat > /dev/null
+    exit 0
+    ;;
+  *)
+    # Unknown subcommand — return clean
+    exit 0
+    ;;
+esac

@@ -1,0 +1,47 @@
+name: Test checksum required enforcement
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure gitleaks is NOT on PATH so the action must try to install it
+        run: |
+          set -euo pipefail
+          # Remove any existing gitleaks from common locations
+          sudo rm -f /usr/local/bin/gitleaks 2>/dev/null || true
+          sudo rm -f /usr/bin/gitleaks 2>/dev/null || true
+          sudo rm -f /bin/gitleaks 2>/dev/null || true
+          # Verify gitleaks is gone
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "WARNING: gitleaks still found at $(command -v gitleaks) — test may not exercise install path"
+          else
+            echo "gitleaks not on PATH — good"
+          fi
+
+      - name: Run Agent Guard with require-checksum=true and no checksum (should fail)
+        id: scan
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is required but not provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should have failed when require-checksum=true and no checksum given"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
