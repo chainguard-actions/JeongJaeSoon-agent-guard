@@ -1,0 +1,48 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure gitleaks is not on PATH (so install step runs)
+        run: |
+          # Verify gitleaks is not pre-installed; if it is, skip this test
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "gitleaks is already installed, skipping checksum enforcement test"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+
+      - id: action
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+        if: env.SKIP == 'false'
+
+      - name: Assert action failed due to missing checksum
+        if: env.SKIP == 'false'
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when require-checksum=true and no checksum provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should have failed but succeeded"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
+
+      - name: Skip notice
+        if: env.SKIP == 'true'
+        run: |
+          echo "PASS: gitleaks already installed, checksum enforcement step is skipped (not applicable)"

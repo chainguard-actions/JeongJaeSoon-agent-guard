@@ -1,0 +1,37 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal custom gitleaks config and scan target
+        run: |
+          # Create a minimal gitleaks config with no rules (everything passes)
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml << 'EOF'
+          title = "custom-test-config"
+          # No rules defined — nothing will be flagged
+          EOF
+
+          # Create a scan target directory (clean content)
+          mkdir -p /tmp/custom-scan-target
+          git init /tmp/custom-scan-target
+          git -C /tmp/custom-scan-target config user.email "test@example.com"
+          git -C /tmp/custom-scan-target config user.name "Test"
+          echo "# Custom config test" > /tmp/custom-scan-target/README.md
+          git -C /tmp/custom-scan-target add .
+          git -C /tmp/custom-scan-target commit -m "init"
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/custom-scan-target
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "PASS: action completed successfully using custom gitleaks config"

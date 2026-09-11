@@ -1,0 +1,597 @@
+## v3.4.1 - 2026-09-11
+
+- fix: preserve exact documentation placeholders (#235)
+- Separate public and internal rollout documentation (#234)
+- Add safe support log file export (#233)
+- Add CLI-managed Claude and Codex plugin lifecycle (#232)
+
+## v3.4.0 - 2026-09-11
+
+- Prepare safe internal rollout, support logs, and portable installs (#230)
+
+## v3.3.0 - 2026-09-10
+
+- `PostToolUse` now scans the file a write tool just targeted, so a secret written to a gitignored path, outside the repository, into a *different* repository, or into a `skip-worktree` / `assume-unchanged` file is caught. Those were blind spots before: the working-tree backstop skips all of them (#221, #228).
+- `scan-working-tree`, and therefore `/agent-guard:verify`, now covers the index as well as the worktree, both diffed against `HEAD`. Staging a secret and then restoring the file on disk no longer hides it. Content that only differs from the index — a committed secret whose staged removal is undone on disk — is still not reported, because only lines added relative to `HEAD` count (#225).
+- Tier-2 PII detection (credit card, US SSN, Korean resident registration number) now requires digit boundaries and a valid Luhn checksum. Epoch-nanosecond timestamps, snowflake-style ids and other long digit runs are no longer read as card numbers, and IPv4 masking rejects out-of-range octets. `AGENT_GUARD_PII_HOOK_MODE=mask` hard-blocks Tier-2 on tool input, so this is what makes that mode usable (#217).
+- New `AGENT_GUARD_PII_SKIP` turns individual **Tier-1** types (`EMAIL`, `PHONE`, `IP_ADDRESS`) off — useful when IPv4 masking hides what you are debugging. A skipped type stops being PII entirely, so `block` mode also stops blocking it; the switch is not output-only. Tier-2 names and unknown names are refused with exit 2, and it requires the built-in `regex` provider (#219).
+- A Bash path block now names the `deny-read-paths` entry that matched and suggests a non-path-shaped rewrite, instead of only reporting `reason=bash_protected_path_text_match`. The gate still fails closed and no verdict changed; the matched command excerpt is deliberately not echoed, so an authenticated URL in the command cannot reach the transcript through the diagnostic (#220).
+- Documentation now matches the code: `/agent-guard:verify`'s scan scope, why gitignored paths are excluded from it, how to distribute policy environment variables through managed settings and verify the value actually took effect, and what Codex managed configuration does and does not offer (#218, #222).
+
+Existing installations need no new setup step: update the plugin and restart the session. In Codex, re-trust the hooks in **Settings > Hooks** after the update, as with any plugin change. `AGENT_GUARD_PII_HOOK_MODE` remains `off` by default; see the README before enabling it, since Tier-2 hard-blocks tool input and a small residual false-positive class remains.
+
+## v3.2.0 - 2026-09-06
+
+- Add an experimental, explicitly enabled pleno-anonymize PII provider with strict response validation. Remote processing remains off by default.
+- Preserve standalone executable links during updates, including legacy payload directory aliases.
+- Prefer the selected healthy shell cache and reject incomplete or redirected cache payloads. Existing shell integrations should rerun setup-shell after updating.
+- Report unavailable direct scans with exit code 3 while preserving fail-closed execution behavior.
+- Explain ambiguous Bash protected-path matches without weakening protection. Inline source expressions can still match the conservative path gate.
+- Limit the setup skill to explicit invocation and clarify what host dispatch, policy denial, dependency failures, and unobserved execution can establish.
+- Clean up GitHub Action scanner downloads after success, failure, and interruption.
+- Reject malformed or multiple remote PII response objects and avoid echoing endpoint details in provider failures.
+
+Use the README for installation, optional PII configuration, shell integration, and troubleshooting.
+
+## v3.1.1 - 2026-09-04
+
+- feat: harden multi-host installation and release flow
+- fix(detection): exempt the Grep content pattern from the deny-path gate (#188)
+- ci: bump hashgraph-online/ai-plugin-scanner-action (#189)
+- docs: document strict Bash path matching (#185)
+- fix(redaction): mask quoted line-start assignments (#184)
+
+## v3.1.0 - 2026-08-31
+
+- fix: address post-merge hook regressions (#182)
+- fix(redaction): accept a carriage return as an assignment delimiter (#181)
+- fix(redaction): mask a KEY=value assignment inside a quoted string leaf (#179)
+- fix(redaction): close the status-label display leak (#177)
+- ci: remove the codex-review workflow (#176)
+- feat(hooks): UserPromptSubmit prompt guard — block pasted secrets on both hosts (#173)
+- feat(detection): block package-manager credential leak vectors (#172)
+- fix(redaction): gate display masking on the value shape (#171)
+- fix(detection): allow env source modules with an intermediate segment (#170)
+- fix(setup-shell): support a fish login shell in setup and detection (#155)
+- ci: bump openai/codex-action from 1.11 to 1.12 (#174)
+- ci: bump hashgraph-online/ai-plugin-scanner-action from 1.2.514 to 1.2.533 (#175)
+- fix(redaction): enforce short-value probe eligibility (#163)
+- fix(pii): validate regex and experimental http adapters (#154)
+- fix(hooks): prefix the Claude setup-skill invocation with a slash (#151)
+- feat(shell)!: remove 1.x bang-guard compat flags; fail loud on unknown args (#167)
+- refactor(hooks): render hook manifests from one template; dedup inline helpers (#166)
+- chore(ci): cap job runtime on merge-gating workflows (#165)
+- refactor(hosts): keep host-specific surfaces in sync with generic logic (#164)
+- Merge pull request #161 from JeongJaeSoon/codex/env-template-filename-policy
+- fix(detection): detect path-qualified cwd wrappers
+- fix(detection): guard reevaluated template paths
+- Merge remote-tracking branch 'origin/main' into codex/env-template-filename-policy
+- Merge pull request #162 from JeongJaeSoon/codex/submission-artifact-lifecycle
+- docs(submission): repin shell re-evaluation guard
+- fix(detection): keep re-evaluated tokens guarded
+- docs(submission): repin env template fix
+- fix(detection): reject dynamic env template tokens
+- fix(submission): require reviewed remote inputs
+- chore(submission): repin merged env template payload
+- Merge remote-tracking branch 'origin/main' into codex/env-template-filename-policy
+- chore(submission): repin hardened env template payload
+- fix(detection): preserve env template deny boundaries
+- refactor(submission): render catalog pin after merge
+- Merge pull request #153 from JeongJaeSoon/fix/display-redaction-chained-colon-labels
+- chore(submission): repin env template payload
+- fix(detection): handle env template filenames safely
+- chore(submission): re-pin reviewed plugin payload
+- Merge remote-tracking branch 'origin/main' into fix/display-redaction-chained-colon-labels
+- Merge pull request #160 from JeongJaeSoon/codex/p1-invalid-toml-escape
+- chore(submission): re-pin reviewed plugin payload
+- fix(lockfiles): handle TOML escape boundaries
+- chore(submission): re-pin reviewed plugin payload
+- fix(lockfiles): reject invalid TOML escapes
+- Merge pull request #157 from JeongJaeSoon/codex/p2-escaped-quote-redaction
+- chore(submission): re-pin reviewed plugin payload
+- test(exec): cover trailing printenv values
+- fix(redaction): bound trailing printenv values
+- test(exec): clarify large fixture indirection
+- chore(submission): re-pin reviewed plugin payload
+- test(exec): cover repeated large printenv values
+- fix(redaction): bound printenv output modeling
+- test(exec): keep high-cardinality probe single-shot
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): fail closed on printenv metadata
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): preserve bounded exec masking
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): guarantee whole-output fallback
+- chore(submission): re-pin reviewed plugin payload
+- perf(redaction): preflight oversized output
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): bound gitleaks output scanning
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): fail closed on raw temp errors
+- chore(submission): re-pin reviewed plugin payload
+- perf(redaction): fast-path framed assignment probes
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): fail closed across bounded output paths
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): bound all detector records
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): stream large hook output into jq
+- chore(submission): re-pin reviewed plugin payload
+- fix(redaction): bound high-cardinality output work
+- Merge origin/main into codex/p2-escaped-quote-redaction
+- Merge pull request #159 from JeongJaeSoon/codex/p1-lockfile-same-line-secrets
+- chore(submission): re-pin reviewed plugin payload
+- fix(detection): reject incomplete TOML state
+- chore(submission): re-pin reviewed plugin payload
+- fix(detection): reject malformed checksum tails
+- chore(submission): re-pin reviewed plugin payload
+- fix(detection): reject incomplete TOML filtering
+- chore(submission): re-pin reviewed plugin payload
+- fix(detection): preserve binary lockfile bytes
+- Merge remote-tracking branch 'origin/main' into codex/p1-lockfile-same-line-secrets
+- ci: bump hashgraph-online/ai-plugin-scanner-action (#147)
+- ci: bump actions/checkout from 7.0.0 to 7.0.1 (#146)
+- chore(ci): re-pin marketplace .source.sha and verify linter download checksums (#152)
+- fix(detection): validate package-lock snapshots
+- fix(detection): scope structural lockfile hashes
+- test: assemble shared redaction fixture safely
+- fix(detection): scan context-free lockfile fragments
+- fix: redact short punctuated secrets safely
+- fix: preserve byte-exact output redaction
+- test: clarify printenv fixture indirection
+- fix: preserve exact exec redaction output
+- fix: redact multiline secrets per output leaf
+- fix(detection): parse structural lockfile fields
+- test(redact): construct secret fixtures at runtime
+- fix(detection): scan beside lockfile checksums
+- fix(redact): mask through escaped quotes
+- fix(redact): mask secrets behind non-status colon labels
+- fix(detection): narrow lockfile checksums and output redaction (#145)
+- fix(runtime): keep Agent Guard stable across plugin upgrades (#143)
+- fix(security): scan-accuracy + shell-parsing hardening batch (#125-#134)
+- Add a host-neutral setup-shell workflow for Codex (#144)
+
+## v3.0.1 - 2026-07-22
+
+- fix: handle sandboxed Agent Guard setup (#141)
+- docs: surface the setup skill as a Claude Code entry point (#135)
+- fix(hooks): report a scan that could not run distinctly from a detection (#137)
+- fix(security): close verified scan bypasses + finish v3.0.0 release (#124)
+
+## Unreleased
+
+- fix(hooks): treat malformed `UserPromptSubmit` JSON as an infrastructure
+  failure instead of collapsing a failed `jq` extraction into an empty prompt.
+  The opt-in closed policy now blocks; the default open policy emits one
+  host-shaped degradation notice.
+- fix(shell): when SessionStart still receives a fish `$SHELL`, require both
+  `.bashrc` and `.zshrc` managed blocks to remain loadable. The host snapshot may
+  choose either shell, so one surviving rc can no longer silence the warning
+  while the other snapshot path is unprotected.
+- fix(redaction): limit the `:` equals-assignment delimiter to the quoted string
+  leaf it was added for. Serialized output such as
+  `{"log":"API_KEY=<value>"}` still masks, while valid compact source such as
+  the JavaScript labelled statement `label:API_KEY=config.apiKey;` is preserved
+  on display and accepted by the prompt guard.
+- fix(redaction): accept a carriage return as an assignment delimiter. A `\r`
+  before the key hid the assignment completely, on display and at the prompt
+  guard, so a secret printed after a progress meter, a spinner, or on
+  classic-Mac line endings reached the model in full and was not blocked when
+  pasted back:
+
+  ```
+    0 12.3M    0 16384    0     0  50000      0\rAPI_KEY=<secret>   ->  no rewrite
+  ```
+
+  `\r` is a delimiter for the same reason it is edge whitespace on the value
+  side: it separates fields on screen and belongs to neither. It joins the
+  leading class of both assignment forms and of the status-label test, so the
+  prose chain the status allowlist protects (`error: password: authentication
+  is disabled`) is now recognised after a carriage return too — previously the
+  label went unseen there and the prose was masked. Measured against the
+  previous release commit over 2,518 carriage-return shapes: 357 real leaks
+  closed, 6 false-positive prose masks removed, and every other newly masked
+  case byte-identical to what that commit already produced with a space in the
+  same position. The status guard in `scan_line` tests the delimiter character
+  directly and had to agree: with the carriage return between the label and the
+  key (`error:\rpassword: <prose>`) the colon assignment matches at the CR, and
+  while that check accepted only space and tab the label went unrecognised and
+  the prose was masked.
+- fix(redaction): mask a `KEY=value` assignment inside a quoted string leaf
+  (#178). The ordinary shape of a tool that returns a serialized log —
+  `{"log":"starting with API_KEY=<value>"}` — reached the model in full on the
+  heuristic path. Two causes, both needed. The enclosing string's own closing
+  quote rode along on the value token, and `looks_like_reference()` tests for an
+  embedded quote without position, so a terminator at the very end marked the
+  token a nested reference and skipped it; a single trailing quote is now
+  stripped the way trailing `}`/`]`/`)` already were, and only when the
+  assignment does not itself begin with a quote, so the line-start re-scan of a
+  value an outer quoted assignment already claimed cannot emit a narrower
+  mapping that beats it. And `:` was not accepted as the delimiter before a
+  quoted key, so the JSON form never matched at all — it joins the class away
+  from `[`, since `[:` opens a POSIX character class and invalidates the whole
+  regex. Credential-handling source code is unchanged: `os.environ["DB_PASSWORD"]`
+  and `ENV.fetch("SESSION_KEY")` keep interior quotes and stay references.
+  Display redaction and the prompt guard; the block/detect path is unchanged.
+  The strip stops at the redaction sentinel: `password=[REDACTED]"` would
+  otherwise lose the `]` that belongs to the marker, so `[REDACTED` was
+  re-emitted as a secret and a stray `]` appended — compounding on every pass
+  and making the prompt guard block text Agent Guard had itself redacted.
+  A trailing carriage return is skipped as edge whitespace, so CRLF output —
+  Windows tools, PowerShell, Docker and CI logs — masks the same shape it
+  does on LF; the carriage return itself is preserved.
+- fix(redaction): close the status-label display-redaction leak (#156). The
+  seven-word status allowlist (`error`, `warning`, `info`, `note`, `debug`,
+  `fatal`, `hint`) let a secret that gitleaks does not recognise reach the model
+  unmasked whenever it sat behind one of those labels — `error: password:
+  <value>` and `warning: db_password: <value>` were displayed in full. The label
+  cannot settle it, because it is identical in the prose chain the allowlist
+  exists to protect (`error: password: authentication is disabled`), so the
+  VALUE now decides: a token whose shape reads as a credential (a digit beside a
+  letter, an uppercase run starting past the first character, or a single-case
+  alphabetic run longer than any ordinary word) masks, while a word, path,
+  number, clock time or date stays visible. The chained shape
+  (`response: error: api_key: <value>`) is covered by the same gate. Display
+  redaction only; the block/detect path is unchanged. An unterminated quoted
+  value (truncated output) is captured and classified when the leaf ends rather
+  than skipped, so a credential-shaped one still masks. A captured value is recorded in
+  both its literal and its edge-trimmed form, so a bare recurrence of a
+  credential that was padded or split across a newline behind its label
+  masks as well. Residual: an
+  all-lowercase alphabetic secret shorter than 24 characters is indistinguishable
+  from a prose word on this path and stays visible.
+- docs: record why the deny-read Bash gate is NOT narrowed (#99). `echo
+  foo.key`, `echo see also foo.pem` and `jq -r .key data.json` are reported as
+  `blocked shell command referencing a deny-listed path` although nothing is
+  read and no such file exists. A command-position narrowing that dropped word
+  operands of commands which take no file operands was written, measured and
+  removed again: every revision of it let a real read through. A newline or `&`
+  starts another command, `|` hands the dropped word to `xargs cat`, a path- or
+  quote-qualified name resolves to a different program than the one compared, an
+  external binary resolves through PATH at execution time so a wrapper inherits
+  the exception, and an exported Bash function named `echo` or `printf` beats
+  the builtin — so even a builtin name does not identify what will run. A text
+  gate that cannot name the program cannot safely drop its operands. #99 stays
+  open as an accepted false positive; the counter-examples are pinned as tests
+  so any re-attempt has to answer them.
+- fix(hooks): drop the undefined `\"` escape from the shell-parser awk bracket
+  expression (#99). gawk warned `regexp escape sequence \" is not a known
+  regexp operator` on every `hook-pre-tool` run, including runs that passed. The
+  class already contains a literal backslash via `\\`, so it is unchanged.
+- ci: remove the `codex-review` workflow. It has never produced a review in
+  this repository: with no `OPENAI_API_KEY` Actions secret every step is
+  skipped, the job reports success in a few seconds, and the feedback job is
+  skipped for an empty message — so it read as a passing check while doing
+  nothing. Codex review on pull requests comes from the ChatGPT Codex GitHub
+  app and is unaffected. Dropping the workflow also stops Dependabot raising
+  version bumps for an action that never runs; the README section documenting
+  it is removed with it.
+- feat(detection): extend the env template marker vocabulary with `tpl`/`tmpl`
+  and accept `-`/`_` marker separators (`.env-example`, `.env_sample`,
+  `.env.tpl`), matching the naming conventions measured on GitHub. The marker
+  must still be final and the stem must stay an env family; `.env.default(s)`
+  stays blocked because dotenv-defaults loads it at runtime.
+- fix(detection): allow env source modules that carry exactly one intermediate
+  segment between the `env`/`envrc` stem and a code extension, so ordinary
+  committed files such as `env.d.ts`, `env.server.ts`, `env.config.ts`, and `env.spec.ts`
+  are readable on both the Read and Bash gates. The final extension must still
+  be code: data/config suffixes (`env.json`, `env.local.json`), extension-less
+  names (`env.d`), the leading-dot runtime form (`.env.d.ts`), deny-listed
+  ancestors, and custom deny policies all stay authoritative.
+- feat(detection): block package-manager credential leak vectors. Deny-read now
+  covers Bundler (`.bundle/config`), RubyGems (`.gem/credentials` and the XDG
+  `gem/credentials` location), Cargo (`.cargo/credentials*`), Composer home
+  `auth.json`, Maven `.m2/settings.xml`, Gradle `.gradle/gradle.properties`,
+  `pip.conf`, Poetry `pypoetry/auth.toml`, and Terraform CLI credentials
+  (`.terraformrc`/`terraform.rc`). Deny-bash now blocks credential dump
+  commands that print stored auth with no path or token in the command text:
+  `bundle config` reads (bare/`list`/`get`/legacy dotted-key read; `set` stays
+  allowed and is gitleaks-scanned), `npm config get` of protected keys,
+  `yarn config get` of npmAuthToken/npmAuthIdent (and the registry/scope maps
+  that nest them), `git credential fill`/any-helper `get`, `pip config
+  list|get`, `composer config` on credential keys or `--list`,
+  `mvn help:effective-settings -DshowPasswords`, and
+  `security find-(generic|internet)-password`; `gcloud auth
+  print-refresh-token` joins the existing gcloud token alternation. The
+  command patterns are hardened against realistic variants an agent may emit:
+  tool aliases (`bundler`, `npm c`/`npm get`), version-suffixed binaries
+  (`pip3.12`), leading global options between a binary and its subcommand
+  (`npm --location=user config get`, `bundle config --parseable`,
+  `bundle --verbose config`, `security -q`, `gcloud --quiet`), Composer's
+  documented `global <command>` wrapper, which runs the same config read
+  against COMPOSER_HOME where the stored OAuth token lives
+  (`composer global config`), wrapper/PHAR invocation forms (`./mvnw`,
+  `php composer.phar`), the direct `git-credential-<helper> get` executable,
+  `pip config debug`, and `$(...)` subshell prefixes; pnpm `config list`
+  (which, unlike npm, does not mask) is blocked, and coverage extends to
+  pnpm/bun. The `mvn` and `composer` patterns are anchored so prose/filenames,
+  value tokens like `repositories.bearer`, and the `showPasswords=false` safe
+  default do not over-block. Adds deny-read for Bun's `.bunfig.toml`; uv and
+  pnpm need no new path (env/.netrc and `.npmrc` respectively already cover
+  them).
+- feat(hooks): add a `UserPromptSubmit` prompt guard on both hosts. Secrets
+  pasted into the user prompt (gitleaks rules or `KEY=value` assignment
+  heuristic) are blocked before submission by default.
+  `AGENT_GUARD_PROMPT_GUARD_MODE` selects `block` (default), `mask` (reserved;
+  degrades to block because neither host lets a hook rewrite the submitted
+  prompt), `warn` (pass through with a host-shaped visible notice), or `off`.
+  The PII input gate (`AGENT_GUARD_PII_HOOK_MODE`) applies to prompts
+  independently of the secret mode, and an invalid PII mode now fails loud on
+  the prompt path too. `read_stdin` uses `cat` when available and prompts over
+  the shared scan cap skip the super-linear assignment probe (gitleaks still
+  applies; the skip follows `AGENT_GUARD_INFRA_FAILURE_MODE`), so a large
+  pasted prompt cannot burn the host hook timeout into a silent fail-open.
+  A prompt-path infrastructure notice is folded into the same response object
+  as the mode-specific message: a hook may write only one top-level JSON
+  document, and emitting the notice separately left two concatenated objects
+  that a host parsing stdout as one document rejects, dropping the warning.
+  The privacy policy now discloses that with the experimental
+  `AGENT_GUARD_PII_PROVIDER=http` adapter in `AGENT_GUARD_PII_HOOK_MODE=block`,
+  the complete text of every submitted prompt — not just tool-input text —
+  is sent to `AGENT_GUARD_PII_REDACT_URL`.
+
+- fix(detection): allow explicitly named env templates such as `sample.env`,
+  `example.envrc`, `.flaskenv.example`, and `.dev.vars.example`, while blocking
+  reverse/runtime forms including `local.env`, `env.local`, `env.preview`, and
+  template-looking names whose final suffix is a runtime or backup marker;
+  preserve custom/non-environment deny precedence and deny-listed ancestors,
+  accept safely quoted Bash template paths, and keep source modules such as
+  `config.env.ts` readable without opening `schema.env.json` data files.
+- fix(runtime): keep plugin hooks and Claude shell integration on the
+  version-independent `current/bin/agent-guard` path. Each plugin execution
+  refreshes `current`, while hook and shell entrypoints fall back to the newest
+  installed semantic version when symlinks are unavailable.
+- test(hooks): lock in commit/push staged scans from the tool payload's target
+  work directory, including linked worktrees and hook processes launched from
+  a different sandbox cwd, so stale-runtime regressions cannot reintroduce the
+  Codex block.
+- fix(runtime): unify scanner-infrastructure failures behind
+  `AGENT_GUARD_INFRA_FAILURE_MODE=open|closed` (default `open`). Hooks, `agx`,
+  and transparent Claude command wrapping now warn once per session and follow
+  the same selected policy; actual secret detections still always block.
+- fix(detection): allow recognized checksum fields in `go.sum`,
+  `package-lock.json`, `yarn.lock`, `Cargo.lock`, and `uv.lock` only when both
+  the lockfile path and checksum-line shape match. Other lockfile content,
+  including embedded credentials, remains scannable.
+- fix(redaction): mask only the value token of a complete secret-bearing
+  assignment. Metadata keys such as `password_policy`, prose such as
+  `error: password: ...`, and text adjacent to a real value are preserved.
+  Suffix-qualified credential keys (`AWS_SECRET_ACCESS_KEY_ID`,
+  `API_KEY_VALUE`, `DB_PASSWORD_HASH`) and whitespace-prefixed colon
+  assignments in log lines still mask.
+- fix(pii): make the accepted PII provider values explicit (#52).
+
+  `regex` remains the supported, local default. `http` is an experimental
+  bring-your-own-endpoint adapter with no service-specific compatibility
+  guarantee. Any other value fails closed instead of falling through to
+  pass-through output. Existing endpoint-backed configurations that fail
+  provider validation should set `AGENT_GUARD_PII_PROVIDER=http` and keep their
+  existing `AGENT_GUARD_PII_REDACT_URL`. Rejected values are now reported
+  exactly once.
+
+- fix(hooks): prefix the Claude Code setup-skill invocation with a slash
+  (#151). The degraded-session warning told Claude Code users to run
+  `agent-guard:setup-agent-guard`; pasted verbatim that is ordinary prompt
+  text, not a skill invocation. Claude Code exposes a plugin skill on the
+  slash-command surface as `/plugin:skill`, which is how this plugin already
+  writes its sibling skill `/agent-guard:setup-shell`. The degraded message
+  and every Claude-facing doc reference now use `/agent-guard:setup-agent-guard`.
+  The Codex form `$setup-agent-guard` is unchanged.
+
+- fix(setup-shell): support a fish login shell and stop the permanent
+  "command wrapping is not loaded" false positive (#139). The marker
+  `AGENT_GUARD_SHELL_INIT_VERSION` only reaches `SessionStart` through the
+  environment of the shell that *launched* the agent, so a fish (or other
+  non-POSIX) login shell — and any GUI/IDE launcher — could never satisfy it,
+  even though the agent's own bash/zsh shell snapshot did load the wrapping from
+  the same rc. `SessionStart` now reads the managed rc block on disk before
+  reporting missing setup, and checks that it can still *load* — the delimiters
+  alone prove nothing, because the block's `eval` emits neither the wrapping nor
+  the marker once the binary it resolves is gone. It replays the block's own
+  resolution order (baked stable path, newest versioned plugin-cache binary,
+  `agent-guard` on `$PATH`) with `stat`-level checks only: silent when setup
+  demonstrably ran and still resolves (only the version-drift comparison is
+  lost), the usual setup guidance when the block is absent, and a distinct
+  `can no longer load` warning when the block is present but resolves nothing
+  (cache updated, uninstalled, hand-edited) — that state leaves command output
+  unmasked, so it must never be silent. `setup-shell` additionally writes the
+  managed block to **both** `~/.bashrc` and `~/.zshrc` when either the process
+  `$SHELL` or the account login shell is fish. Account lookup uses `getent
+  passwd` on Linux and `dscl UserShell` on macOS, with a non-fatal process-shell
+  fallback; this covers the standard skill path where Claude's Bash tool reports
+  zsh even though passwd reports fish. The CLI also says plainly that no
+  automatic `agx` or nudge exists at a fish prompt and prints an executable path
+  for plugin-only installs where bare `agent-guard` is not on `PATH`. No
+  fish-syntax marker is written or faked: claiming protection fish cannot
+  provide would be worse than the warning it replaces.
+- fix(hooks): report a scan that could not run distinctly from a detection
+  (#137). A scanner precondition failure and a real detection previously looked
+  identical — both printed and exited 2 — so an operator could not tell whether
+  agent-guard had found something in their staged changes or had never managed
+  to look. The message names the directory and the action instead of an internal
+  subcommand; hook handling now follows the infrastructure policy above.
+
+  CLI behaviour change: `agent-guard scan-staged` and `agent-guard
+  scan-working-tree` invoked outside a git work tree now exit **3** rather than
+  2. Everything in this repo treats non-zero as failure (the native pre-commit
+  hook, the `make` targets, the verify command), so no consumer changes — but
+  scripts that test for exactly 2 should be updated. Direct scan commands and
+  native Git hooks still treat every non-zero result as uncleared.
+
+## v3.0.0 - 2026-07-19
+
+- feat!: simplify managed deployment to settings merge plus developer setup (#122)
+
+Breaking changes (see the [upgrade guidance](README.md#upgrading-older-installations)):
+
+- Removed the `managed-install.sh` entrypoint and the self-contained
+  `managed-bootstrap.sh`, including the `managed-bootstrap.sh` /
+  `managed-bootstrap.sh.sha256` release assets.
+- Removed the Codex managed hook path (`deployment/codex-hook`,
+  `deployment/codex-requirements.toml.template`); Codex users install the
+  plugin through the standard install.
+- Removed `setup-shell --prepend-path`.
+
+## v2.2.0 - 2026-07-18
+
+- feat: add self-contained managed bootstrap (#119)
+
+## v2.1.0 - 2026-07-18
+
+- feat: add managed deployment for Claude Code and Codex (#117)
+- docs: pin community submission source (#116)
+- docs: prepare Claude marketplace submission review (#115)
+- docs: lead quick start with Claude Code and Codex (#54)
+- ci: bump hashgraph-online/ai-plugin-scanner-action from 1.2.286 to 1.2.484 (#111)
+- ci: bump openai/codex-action from 1.9 to 1.11 (#107)
+
+## v2.0.1 - 2026-07-17
+
+- fix(hooks): scan `NotebookEdit` cell content so secrets written to notebook cells are blocked (and PII when `AGENT_GUARD_PII_HOOK_MODE=block`) (#112)
+
+## v2.0.0 - 2026-07-14
+
+- feat(shell)!: make Claude command wrapping stable and default-on, with `--no-command-wrapping` and `AGENT_GUARD_COMMAND_WRAPPING=off` opt-outs
+- feat(install): enable command wrapping from direct bootstrap and add `/agent-guard:setup-shell` for plugin installs
+- docs: add the 1.x to 2.x migration guide and move GitHub Action examples to the preserved `v2` release line
+- ci(release): verify publishing `v2` does not move the existing `v1` compatibility tag
+
+## v1.10.1 - 2026-07-14
+
+- fix(codex): verify the plugin-local binary, hook trust, and live host dispatch during guided setup
+- fix(codex): use harmless dedicated sentinels for live PreToolUse and PostToolUse probes
+- docs(codex): document wrapping-tool boundaries and require pre/post live probes
+- fix(shell): mask bare `printenv NAME` values with their variable-name context
+
+## v1.10.0 - 2026-07-13
+
+- feat(codex): add guided dependency setup and host-native hook responses
+- feat(shell): graduate the Claude bang-command guard to a supported opt-in
+
+## v1.9.0 - 2026-07-07
+
+- feat(plugin): warn on version drift between plugin hooks and the shell-integration CLI (#104)
+- feat(bench): per-channel leak-prevention benchmark (#90)
+
+## v1.8.0 - 2026-07-06
+
+- feat(detection): catch low-entropy vendor-prefixed tokens by shape alone (#101)
+- feat(detection): allow dotenv-style template files via suffix rule (#100)
+
+## v1.7.1 - 2026-07-03
+
+- fix(shell): make setup-shell rc line self-healing when the CLI leaves $PATH (#96)
+
+## v1.7.0 - 2026-07-02
+
+- feat(shell): resolve agent-guard without a PATH install for the bang guard (#94)
+
+## v1.6.0 - 2026-07-02
+
+- feat(shell): experimental opt-in bang-command guard (#92)
+
+## v1.5.0 - 2026-07-01
+
+- feat(shell): mask ! shell-escape output via agent-guard exec + shell-init (#86)
+- feat(detection): broaden output secret recall (JWT, bearer, more env keys) (#85)
+
+## v1.4.0 - 2026-07-01
+
+- test: harden tests/run.sh temp files with mktemp (CWE-377) (#82)
+- chore(changelog): drop stale Unreleased block ahead of v1.4.0 (#81)
+- ci: bump actions/github-script from 7.1.0 to 9.0.0 (#71)
+- ci: bump actions/checkout from 5.0.1 to 7.0.0 (#74)
+- ci: bump openai/codex-action from 1.8 to 1.9 (#76)
+- ci: bump hashgraph-online/ai-plugin-scanner-action (#75)
+- docs: document shell-escape hook-bypass blind spot (#80)
+- feat(agent-guard): mask PII in tool output via mask mode (#78)
+- feat(agent-guard): mask secret-like values in tool output (#77)
+- docs(readme): lead with a Claude Code quick start to lift install conversion (#73)
+- feat(plugin): add Codex composer icon for Agent Guard (#72)
+- ci: add HOL plugin scanner self-scan and harden CI workflows (#68)
+
+## v1.3.8 - 2026-06-16
+
+- docs: separate demo steps with blank lines for readability (#66)
+- docs: render README badges in a single row (#65)
+
+## v1.3.7 - 2026-06-16
+
+- feat(agent-guard): rename Action to a unique GitHub Marketplace name (#63)
+
+## v1.3.6 - 2026-06-16
+
+- feat(agent-guard): unify positioning + Action branding for Marketplace publish (#61)
+- fix(agent-guard): close fail-open gaps in hook input handling and deny-read Bash scan (#60)
+- fix(agent-guard): calibrate secret-detection patterns (#59)
+
+## v1.3.5 - 2026-05-24
+
+- Merge pull request #57 from JeongJaeSoon/codex/plugin-layout-validation-ci
+- Normalize plugin validation workflow names
+- Tighten plugin root variable validation
+- Split plugin layout validation steps
+- Add plugin layout validation CI
+- Merge pull request #56 from JeongJaeSoon/codex/codex-claude-plugin-hooks
+- Align Codex hooks with plugin layout
+- Use host-specific plugin hooks
+- Improve Codex and Claude plugin hook compatibility
+- feat: add PII filtering provider adapters (#51)
+- [codex] Harden agent tool input scanning (#49)
+- [codex] Add Codex code review workflow (#55)
+- fix install hook quoting and docs
+
+## v1.3.4 - 2026-05-09
+
+- docs: clarify codex plugin hook setup (#46)
+- ci: use checkout v5 (#45)
+
+## v1.3.3 - 2026-05-09
+
+- fix: include install script in release tarball (#43)
+
+## v1.3.2 - 2026-05-09
+
+- Fix real user install and verification flows
+- simplify: narrow PostToolUse matcher, dedupe deny-read path, guard gitleaks version drift (#40)
+- docs: fix v1 raw URL for gitleaks-checksum.sh after plugin restructure (#39)
+
+## v1.2.1 - 2026-05-08
+
+- fix(cli): follow symlinks when resolving SCRIPT_DIR (#34)
+
+## v1.2.0 - 2026-05-08
+
+- docs: restructure README around user task flow (#32)
+- feat: add gitleaks-checksum helper (script + subcommand + slash command) (#31)
+- refactor: simplify bin/agent-guard helper functions (#30)
+
+## v1.1.2 - 2026-05-07
+
+- feat(plugin): add /agent-guard:verify slash command (#26)
+- chore(release): make release.yml idempotent on re-dispatch (#25)
+- fix(release): bump VERSION constant in bin/agent-guard on release (#24)
+
+## v1.1.1 - 2026-05-07
+
+- Revert "chore(release): v1.1.1 (#20)" (#22)
+- fix(release): build tarball outside the directory being archived (#21)
+
+## v1.1.0 - 2026-05-07
+
+- Revert "chore(release): v1.1.0 (#15)" (#17)
+- fix(release): exclude tarball self-reference from tar input (#16)
+
+## v1.0.2 - 2026-05-07
+
+- fix(release): pick latest semver tag, ignore moving major tag (#10)
+- chore(release): also bump marketplace.json plugin version (#9)
+- docs: add Quickstart section with plugin install paths (#8)
+
+## v1.0.1 - 2026-05-07
+
+- chore(release): add automated release workflow (#5)
+- simplify: remove scan_text_hook, fix sub-shell exit, drop make doctor, optimize deny-pattern checks (#4)
+- chore: usability and robustness pass (#3)
+- [codex] Add CI and clean public-readiness scan noise (#2)
+- Harden against Bash/path bypass, Codex patch parsing, symlink, and action injection (#1)

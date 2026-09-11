@@ -1,0 +1,15 @@
+{
+  "name": "agent-guard",
+  "description": "Local-by-default, no-telemetry guardrails that inspect supported agent tool calls and changed files to prevent secret leaks.",
+  "owner": {
+    "name": "Agent Guard contributors"
+  },
+  "plugins": [
+    {
+      "name": "agent-guard",
+      "source": "./plugins/agent-guard",
+      "description": "Local-by-default, no-telemetry hooks inspect user prompts, supported tool inputs, outputs, and changed files in every enabled Claude Code or Codex session to block or mask secret leaks. Includes opt-in PII filtering and Git/CI backstops.",
+      "version": "3.4.1"
+    }
+  ]
+}
