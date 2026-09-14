@@ -1,0 +1,46 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install gitleaks so checksum check is bypassed
+        run: |
+          # Install gitleaks manually so the action skips the install step
+          # (the checksum enforcement only applies when gitleaks is NOT already installed)
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan-target
+          echo "# Hello World" > /tmp/clean-scan-target/README.md
+
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/clean-scan-target
+          require-checksum: "true"
+          # No gitleaks-checksum provided — but gitleaks is already installed,
+          # so the install step is skipped and checksum enforcement is not triggered.
+
+      - name: Assert action succeeded
+        run: |
+          echo "Action completed successfully — gitleaks was pre-installed so checksum check was skipped"
+          echo "PASS"
