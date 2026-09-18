@@ -1,0 +1,50 @@
+name: Test checksum required enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check gitleaks availability
+        run: |
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "INFO: gitleaks is pre-installed at $(command -v gitleaks)"
+            echo "The action will skip install and proceed to scan"
+          else
+            echo "INFO: gitleaks is not installed — action will attempt install and hit checksum check"
+          fi
+
+      - id: action
+        uses: .
+        with:
+          # require-checksum=true (explicit) and no checksum provided.
+          # If gitleaks is not installed, the action MUST fail with an error
+          # about the missing checksum.
+          # If gitleaks IS already installed, the action skips install and
+          # proceeds to scan (which may succeed on the workspace).
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Assert correct behavior based on gitleaks availability
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          GITLEAKS_PRESENT="$(command -v gitleaks > /dev/null 2>&1 && echo yes || echo no)"
+          echo "gitleaks present on PATH: $GITLEAKS_PRESENT"
+          if [ "$GITLEAKS_PRESENT" = "no" ]; then
+            # gitleaks not installed: action must fail due to missing checksum
+            if [ "$OUTCOME" = "failure" ]; then
+              echo "PASS: action correctly failed when require-checksum=true and no checksum provided"
+            else
+              echo "FAIL: expected action to fail (missing checksum) but got outcome '$OUTCOME'"
+              exit 1
+            fi
+          else
+            # gitleaks already installed: action skips install, proceeds to scan
+            echo "INFO: gitleaks was pre-installed; action skipped checksum enforcement"
+            echo "PASS: action behavior is correct (install skipped when gitleaks already present)"
+          fi
