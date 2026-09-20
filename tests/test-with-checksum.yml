@@ -1,0 +1,45 @@
+name: Test scan with pinned checksum verification
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download gitleaks and capture its checksum
+        id: setup
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="linux"
+          ARCH="x64"
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          # Compute the actual checksum of the downloaded archive
+          CHECKSUM="$(sha256sum "$TMP/$ARCHIVE" | awk '{print $1}')"
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "archive=$TMP/$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "tmp=$TMP" >> "$GITHUB_OUTPUT"
+          echo "Computed checksum: $CHECKSUM"
+
+      - name: Run Agent Guard with pinned gitleaks checksum
+        id: action
+        uses: .
+        with:
+          paths: "."
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: ${{ steps.setup.outputs.checksum }}
+          require-checksum: "true"
+
+      - name: Assert scan completed successfully with checksum verification
+        run: |
+          echo "PASS: Agent Guard scan completed with checksum-verified gitleaks install"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf "${{ steps.setup.outputs.tmp }}" || true
