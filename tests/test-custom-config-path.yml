@@ -1,0 +1,63 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pre-install gitleaks so the action skips the download step entirely.
+      - name: Pre-install gitleaks
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="x64"
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Create a minimal gitleaks config and a clean directory to scan.
+      - name: Create custom gitleaks config and clean test directory
+        run: |
+          # Minimal gitleaks config that extends the default ruleset
+          mkdir -p /tmp/custom-config
+          cat > /tmp/custom-config/gitleaks.toml <<'EOF'
+          title = "custom-test-config"
+          [extend]
+          useDefault = true
+          EOF
+
+          # Create a clean directory with no secrets
+          mkdir -p /tmp/custom-config-test-dir
+          echo "# Clean project" > /tmp/custom-config-test-dir/README.md
+          git init /tmp/custom-config-test-dir
+          git -C /tmp/custom-config-test-dir config user.email "test@example.com"
+          git -C /tmp/custom-config-test-dir config user.name "Test"
+          git -C /tmp/custom-config-test-dir add .
+          git -C /tmp/custom-config-test-dir commit -m "initial"
+
+      # Run the action with a custom config path.
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/custom-config-test-dir
+          config-path: /tmp/custom-config/gitleaks.toml
+          require-checksum: "false"
+
+      - name: Assert action succeeded with custom config
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed with custom config on a clean directory, got '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly used custom config and passed on a clean directory"

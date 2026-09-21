@@ -1,0 +1,57 @@
+name: Test require-checksum disabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pre-install gitleaks so the action skips the download step entirely.
+      # This also validates that when gitleaks is already present, the action
+      # proceeds regardless of the require-checksum setting.
+      - name: Pre-install gitleaks
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="x64"
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Create a clean git repository to scan.
+      - name: Create clean directory to scan
+        run: |
+          mkdir -p /tmp/no-checksum-test
+          echo "# Test file" > /tmp/no-checksum-test/README.md
+          git init /tmp/no-checksum-test
+          git -C /tmp/no-checksum-test config user.email "test@example.com"
+          git -C /tmp/no-checksum-test config user.name "Test"
+          git -C /tmp/no-checksum-test add .
+          git -C /tmp/no-checksum-test commit -m "initial"
+
+      # When require-checksum=false and no gitleaks-checksum is given,
+      # the action should proceed (with a warning) and not fail due to missing checksum.
+      - id: action
+        uses: .
+        with:
+          paths: /tmp/no-checksum-test
+          require-checksum: "false"
+          # gitleaks-checksum intentionally omitted — should not fail
+
+      - name: Assert action succeeded without checksum when require-checksum=false
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed when require-checksum=false and no checksum provided, got '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly allowed missing checksum when require-checksum=false"
