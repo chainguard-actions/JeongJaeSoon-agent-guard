@@ -1,0 +1,49 @@
+name: Test checksum required enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure gitleaks is NOT pre-installed
+        run: |
+          # If gitleaks is already installed, skip this test scenario
+          # (the checksum check only runs when gitleaks needs to be installed)
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "gitleaks already installed, skipping checksum enforcement test"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+
+      - id: action
+        name: Run Agent Guard without checksum (should fail)
+        uses: .
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          SKIP: ${{ env.SKIP }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "skip: $SKIP"
+          if [ "$SKIP" = "true" ]; then
+            echo "PASS: gitleaks already installed, checksum enforcement not applicable"
+            exit 0
+          fi
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is required but not provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should have failed when require-checksum=true and no checksum provided"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

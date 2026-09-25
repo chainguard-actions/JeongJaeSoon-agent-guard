@@ -1,0 +1,26 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-scan-target
+          echo "# Hello World" > /tmp/clean-scan-target/README.md
+          echo "name: my-project" > /tmp/clean-scan-target/config.yaml
+          echo "version: 1.0.0" >> /tmp/clean-scan-target/config.yaml
+
+      - id: action
+        name: Run Agent Guard on clean directory
+        uses: .
+        with:
+          paths: /tmp/clean-scan-target
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: agent-guard scan completed successfully on clean directory"
