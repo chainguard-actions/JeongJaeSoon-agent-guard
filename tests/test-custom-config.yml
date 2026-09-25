@@ -1,0 +1,48 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_GUARD_GITLEAKS_BIN: /usr/local/bin/gitleaks
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install jq if missing
+        run: |
+          command -v jq > /dev/null 2>&1 || sudo apt-get install -y jq
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          set -euo pipefail
+          sudo cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          echo "mock gitleaks installed at $(command -v gitleaks)"
+
+      - name: Create a custom gitleaks config and clean scan target
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/custom-config"
+          printf 'title = "custom-test-config"\n\n[extend]\nuseDefault = true\n' \
+            > "$GITHUB_WORKSPACE/custom-config/gitleaks.toml"
+
+          mkdir -p "$GITHUB_WORKSPACE/custom-config-scan-target"
+          echo "# Clean project" > "$GITHUB_WORKSPACE/custom-config-scan-target/README.md"
+          git -C "$GITHUB_WORKSPACE/custom-config-scan-target" init
+          git -C "$GITHUB_WORKSPACE/custom-config-scan-target" config user.email "test@example.com"
+          git -C "$GITHUB_WORKSPACE/custom-config-scan-target" config user.name "Test"
+          git -C "$GITHUB_WORKSPACE/custom-config-scan-target" add .
+          git -C "$GITHUB_WORKSPACE/custom-config-scan-target" commit -m "initial"
+
+      - id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/custom-config-scan-target"
+          require-checksum: "false"
+          config-path: "${{ github.workspace }}/custom-config/gitleaks.toml"
+
+      - name: Assert action succeeded with custom config
+        run: |
+          echo "Action completed successfully with custom gitleaks config"
+          echo "PASS"

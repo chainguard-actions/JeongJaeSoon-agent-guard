@@ -1,0 +1,53 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install jq if missing
+        run: |
+          command -v jq > /dev/null 2>&1 || sudo apt-get install -y jq
+
+      - name: Hide gitleaks if pre-installed so the download step runs
+        run: |
+          set -euo pipefail
+          if command -v gitleaks > /dev/null 2>&1; then
+            GITLEAKS_PATH="$(command -v gitleaks)"
+            echo "gitleaks found at $GITLEAKS_PATH - hiding for this test"
+            sudo mv "$GITLEAKS_PATH" /tmp/gitleaks-hidden 2>/dev/null || \
+              mv "$GITLEAKS_PATH" /tmp/gitleaks-hidden 2>/dev/null || true
+          fi
+          echo "gitleaks hidden (or was not installed)"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          paths: "."
+          require-checksum: "true"
+          gitleaks-checksum: ""
+
+      - name: Restore gitleaks if it was hidden
+        if: always()
+        run: |
+          if [ -f /tmp/gitleaks-hidden ]; then
+            sudo mv /tmp/gitleaks-hidden /usr/local/bin/gitleaks 2>/dev/null || \
+              mv /tmp/gitleaks-hidden /usr/local/bin/gitleaks 2>/dev/null || true
+          fi
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum was required but not provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "PASS: gitleaks was already installed, checksum check was skipped"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -1,0 +1,45 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_GUARD_GITLEAKS_BIN: /usr/local/bin/gitleaks
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install jq if missing
+        run: |
+          command -v jq > /dev/null 2>&1 || sudo apt-get install -y jq
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          set -euo pipefail
+          sudo cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          echo "mock gitleaks installed at $(command -v gitleaks)"
+
+      - name: Create a clean git repository to scan
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/clean-scan-target"
+          echo "# Hello World" > "$GITHUB_WORKSPACE/clean-scan-target/README.md"
+          echo "name: my-project" > "$GITHUB_WORKSPACE/clean-scan-target/config.yaml"
+          echo "version: 1.0.0" >> "$GITHUB_WORKSPACE/clean-scan-target/config.yaml"
+          git -C "$GITHUB_WORKSPACE/clean-scan-target" init
+          git -C "$GITHUB_WORKSPACE/clean-scan-target" config user.email "test@example.com"
+          git -C "$GITHUB_WORKSPACE/clean-scan-target" config user.name "Test"
+          git -C "$GITHUB_WORKSPACE/clean-scan-target" add .
+          git -C "$GITHUB_WORKSPACE/clean-scan-target" commit -m "initial"
+
+      - id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/clean-scan-target"
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "Action completed successfully - no secrets detected in clean directory"
+          echo "PASS"

@@ -1,0 +1,51 @@
+name: Test multiple paths scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_GUARD_GITLEAKS_BIN: /usr/local/bin/gitleaks
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install jq if missing
+        run: |
+          command -v jq > /dev/null 2>&1 || sudo apt-get install -y jq
+
+      - name: Install mock gitleaks on PATH
+        run: |
+          set -euo pipefail
+          sudo cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          echo "mock gitleaks installed at $(command -v gitleaks)"
+
+      - name: Create multiple clean git repositories to scan
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/multi-scan-dir1"
+          echo "# Project A" > "$GITHUB_WORKSPACE/multi-scan-dir1/README.md"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir1" init
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir1" config user.email "test@example.com"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir1" config user.name "Test"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir1" add .
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir1" commit -m "initial"
+
+          mkdir -p "$GITHUB_WORKSPACE/multi-scan-dir2"
+          echo "# Project B" > "$GITHUB_WORKSPACE/multi-scan-dir2/README.md"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir2" init
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir2" config user.email "test@example.com"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir2" config user.name "Test"
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir2" add .
+          git -C "$GITHUB_WORKSPACE/multi-scan-dir2" commit -m "initial"
+
+      - id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/multi-scan-dir1 ${{ github.workspace }}/multi-scan-dir2"
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "Action completed successfully - multiple path scan found no secrets"
+          echo "PASS"

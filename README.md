@@ -1,41 +1,125 @@
-# JeongJaeSoon/agent-guard
+# Agent Guard
 
-Deterministic secret scanning guardrails for CI
+Agent Guard is a local-first guardrail for Claude Code, Codex, Git hooks,
+GitHub Actions, and direct shell use. It blocks common secret-exposure paths
+before a supported tool runs, redacts supported tool output, and scans changed
+files after mutations. It uses `gitleaks` and portable shell; it has no hosted
+account, telemetry collector, or developer service.
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/JeongJaeSoon/agent-guard](https://github.com/JeongJaeSoon/agent-guard).
+It is a defense-in-depth boundary. Keep GitHub Secret Scanning, Push
+Protection, review, and normal credential management in place. Agent Guard is
+not a vault, DLP system, EDR, or credential rotator.
 
-## Versions
+![Agent Guard blocking an agent's read of a .env that holds a private key, then a scan flagging the leak](docs/demo.gif)
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.10.0 | [`v1.10.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.10.0) | [`76072b4`](https://github.com/JeongJaeSoon/agent-guard/commit/76072b432c8a38cd739118b2e2909ebe796122c5) |
-| v1.10.1 | [`v1.10.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.10.1) | [`a795c72`](https://github.com/JeongJaeSoon/agent-guard/commit/a795c72e0c9a58ce8a5d0eee5e92423f3cf3e4e1) |
-| v1.3.4 | [`v1.3.4`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.4) | [`9e97a58`](https://github.com/JeongJaeSoon/agent-guard/commit/9e97a58dbfb84faf465db29f33d8686c961d25ec) |
-| v1.3.5 | [`v1.3.5`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.5) | [`acbf845`](https://github.com/JeongJaeSoon/agent-guard/commit/acbf845fc9d65ae8834d82d1ac7c6ed531f2aed2) |
-| v1.3.6 | [`v1.3.6`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.6) | [`59d552a`](https://github.com/JeongJaeSoon/agent-guard/commit/59d552a4642b691faab03982e90d2c2af831e869) |
-| v1.3.7 | [`v1.3.7`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.7) | [`de2f255`](https://github.com/JeongJaeSoon/agent-guard/commit/de2f2558d9438b376801f8f3890ccb552d97d830) |
-| v1.3.8 | [`v1.3.8`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.3.8) | [`70a86fc`](https://github.com/JeongJaeSoon/agent-guard/commit/70a86fce436ea0ccb7741f0e1ceda1c41b2b6ecc) |
-| v1.5.0 | [`v1.5.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.5.0) | [`b56ac9e`](https://github.com/JeongJaeSoon/agent-guard/commit/b56ac9e06220373821c1237b2b649c161c48e7b8) |
-| v1.7.0 | [`v1.7.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.7.0) | [`3f1ff29`](https://github.com/JeongJaeSoon/agent-guard/commit/3f1ff299a935c05e1dcd90493f16fdb602ff00a8) |
-| v1.7.1 | [`v1.7.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.7.1) | [`955c270`](https://github.com/JeongJaeSoon/agent-guard/commit/955c2703ad0f9e86a97c598625d455036506f986) |
-| v1.8.0 | [`v1.8.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.8.0) | [`5d1a064`](https://github.com/JeongJaeSoon/agent-guard/commit/5d1a064e1587ef43b76fa642a1b4038d802f79d3) |
-| v1.9.0 | [`v1.9.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v1.9.0) | [`ed5c32b`](https://github.com/JeongJaeSoon/agent-guard/commit/ed5c32b93dfa7fa55e3da941e7e1b6028df51a8b) |
-| v2.0.0 | [`v2.0.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v2.0.0) | [`65008a9`](https://github.com/JeongJaeSoon/agent-guard/commit/65008a97b3584f70872b01ba68824ff63ca93df6) |
-| v2.0.1 | [`v2.0.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v2.0.1) | [`967b174`](https://github.com/JeongJaeSoon/agent-guard/commit/967b174c64a6d280ab4d55cc9ce78b11e62cef4b) |
-| v3.0.1 | [`v3.0.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.0.1) | [`6fccc4a`](https://github.com/JeongJaeSoon/agent-guard/commit/6fccc4a2428ac08bc4d4ef5b6fc2632b48a18a20) |
-| v3.1.0 | [`v3.1.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.1.0) | [`98726f2`](https://github.com/JeongJaeSoon/agent-guard/commit/98726f2244e6ab0dd67d8a29aee8d3e742edd387) |
-| v3.1.1 | [`v3.1.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.1.1) | [`b1d168e`](https://github.com/JeongJaeSoon/agent-guard/commit/b1d168e4725555378f6cfa5a28cd51858562271d) |
-| v3.2.0 | [`v3.2.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.2.0) | [`75b16e6`](https://github.com/JeongJaeSoon/agent-guard/commit/75b16e6fdada301c80d883ea94347afd5c6d7623) |
-| v3.3.0 | [`v3.3.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.3.0) | [`e6314ec`](https://github.com/JeongJaeSoon/agent-guard/commit/e6314ec7fc91596dbed75499e3c390c8432e0ff8) |
-| v3.4.0 | [`v3.4.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.0) | [`a4bb9d8`](https://github.com/JeongJaeSoon/agent-guard/commit/a4bb9d8be7558a0c6210b38bd02bb1ec16db4bdf) |
-| v3.4.1 | [`v3.4.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.1) | [`f2edc23`](https://github.com/JeongJaeSoon/agent-guard/commit/f2edc23f2b7d5d772345046f423ae14df759a9ca) |
-| v3.4.2 | [`v3.4.2`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.2) | [`050991b`](https://github.com/JeongJaeSoon/agent-guard/commit/050991b5432cdef415feec98f18aa5d16905fd4b) |
-| v3.4.3 | [`v3.4.3`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.3) | [`a225874`](https://github.com/JeongJaeSoon/agent-guard/commit/a2258746de3edea513a5ad02e95b10f1c7c458a6) |
-| v3.4.4 | [`v3.4.4`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.4) | [`4e1712c`](https://github.com/JeongJaeSoon/agent-guard/commit/4e1712c73c6c3289e0106e9e53820eeb8fb409a0) |
-| v3.4.5 | [`v3.4.5`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.4.5) | [`be00491`](https://github.com/JeongJaeSoon/agent-guard/commit/be004915b81afb46931ea8e4a83fd59540e40736) |
-| v3.5.0 | [`v3.5.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.0) | [`56fc533`](https://github.com/JeongJaeSoon/agent-guard/commit/56fc533ac875442f07bad9bcaac701743bd9033b) |
-| v3.5.1 | [`v3.5.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.1) | [`7e71db6`](https://github.com/JeongJaeSoon/agent-guard/commit/7e71db6b608fb6fb9649310a9787a17aa294ae81) |
-| v3.5.2 | [`v3.5.2`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.2) | [`e0dee88`](https://github.com/JeongJaeSoon/agent-guard/commit/e0dee88a8fc1b037e5268197bd7fe7445b4dd394) |
+## Keep secrets out of Git
+
+A key that lands in a commit lives in history long after you delete the file.
+Agent Guard puts a gitleaks scan in front of the commit routes it hooks, so a
+detected API key, token, or `.env` value is stopped before it enters history,
+with CI behind it as a backstop:
+
+| Who commits | What stops the leak |
+| --- | --- |
+| An agent in Claude Code or Codex | Before the agent's `git commit` or `git push` runs, the plugin scans the staged added lines and blocks the command on a secret-like value. It also refuses `--no-verify` and `--no-gpg-sign` on those commands, so the agent cannot switch the check off with a flag. |
+| Any local commit, yours or an agent's | Once installed, the [native pre-commit hook](docs/integrations.md#native-git-hook) scans the staged added lines after Git has staged everything the commit will include, and aborts the commit on a finding or when the scan cannot run. Git skips it for `git commit --no-verify`; the plugin refuses that flag for agents, and CI covers the rest. |
+| Anyone, after a push | The [GitHub Action](docs/integrations.md#github-actions) scans the checked-out files of each push or pull request it runs on, as the repository backstop. |
+
+The plugin scans what the commit would contain. That covers the index and also
+the tracked changes Git stages by itself for `git commit -a`, `--patch`, or a
+pathspec such as `git commit <path>`, `--include`, or `--only`, and the
+untracked files that `--interactive` can add. When an argument is only known at
+run time, such as `git commit $FLAGS`, or the same command runs `git add` first,
+the plugin scans every tracked change and untracked file, including ignored
+files after `git add -f`. Shell code the command line passes to `bash -c`,
+`sh -c`, a here-string, `env -S`, or `eval` is checked like the command
+itself. When that code, the git subcommand, or the working directory is only
+known at run time, the plugin cannot tell what the command commits, and the
+infrastructure policy below decides.
+
+The plugin scans the files as they are when the command starts. If an earlier
+part of the same command writes a file, or changes into another repository,
+the plugin does not see the result, so install the native hook as well. The
+push gate checks what is staged, not commits that already exist. A secret
+committed outside these hooks is caught by CI while it is still in the
+checked-out tree.
+
+A scan that could not run is not treated as clean. In the Claude Code and Codex
+plugins, the default warns that protection is degraded and lets the command
+continue, and `AGENT_GUARD_INFRA_FAILURE_MODE=closed` blocks it instead (see
+[Configuration](docs/configuration.md)). The native hook and the Action fail on
+an unavailable scan regardless of that setting.
+
+## Choose your path
+
+| I need to… | Start here |
+| --- | --- |
+| Install a Claude Code or Codex plugin, CLI, Git hook, or Action | [Installation](docs/installation.md) |
+| Understand host coverage and configure an integration | [Integrations](docs/integrations.md) |
+| Know which tool routes output masking reaches and how hosts differ | [Output masking coverage](docs/integrations.md#output-masking-coverage) |
+| Verify a setup and understand what the result proves | [Verification](docs/verification.md) |
+| Configure policy, PII, redaction, or infrastructure behavior | [Configuration](docs/configuration.md) |
+| Deploy for a managed team or troubleshoot an environment | [Operations](docs/operations.md); the [Korean/Japanese deployment guide](https://agent-guard-guide.jaesoon.chatgpt.site/) is a supplementary, currently published walkthrough |
+
+## Quick use
+
+After installing a plugin, run its guided setup:
+
+```text
+# Claude Code
+/agent-guard:setup-agent-guard
+
+# Codex
+$setup-agent-guard
+```
+
+The setup flow checks local dependencies and runs synthetic checks. It does not
+prove that your current host tool route dispatches hooks; complete the harmless
+live probes in [Verification](docs/verification.md) before relying on a plugin
+boundary.
+
+For a direct repository check:
+
+```sh
+agent-guard scan-working-tree
+agent-guard scan-staged
+agent-guard scan-path .
+```
+
+## Support log
+
+Save the metadata-only local support log with one command:
+
+```sh
+agent-guard logs export --output agent-guard-support.jsonl
+```
+
+The parent directory must already exist. Agent Guard creates a new mode-0600
+file and refuses to replace an existing file or symlink. Use the plugin-local
+executable printed by the setup skill when a plugin-only installation does not
+provide `agent-guard` on `PATH`. See [Support](SUPPORT.md) for what to submit.
+
+## Requirements and scope
+
+Supported platforms are macOS and Linux on x64 and arm64. Runtime dependencies
+are `sh`, `awk`, `git`, `jq`, and gitleaks 8.30 or newer. Windows is not
+currently supported. One of `setsid` (from `util-linux` on Linux) or Perl is
+also required to run the gitleaks version probe in its own process group.
+`agent-guard doctor` reports a missing isolation tool with the install command
+for your platform.
+
+Default processing is local and ephemeral. Read [Privacy](PRIVACY.md) before
+enabling an endpoint-backed PII provider. Read [Security](SECURITY.md) for
+responsible disclosure and [Support](SUPPORT.md) for safe reports.
+
+## Project documents
+
+- [Privacy and data handling](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Changelog](CHANGELOG.md)
+- [Known limitations](docs/integrations.md#limits-and-backstops)
 
 ## Privacy
 
