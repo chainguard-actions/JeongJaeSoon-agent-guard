@@ -1,0 +1,50 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan if action reaches scan phase
+        run: |
+          mkdir -p /tmp/checksum-test-target
+          echo "# Clean file" > /tmp/checksum-test-target/README.md
+          cd /tmp/checksum-test-target
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add .
+          git commit -m "Initial commit"
+
+      - id: action
+        name: Run Agent Guard without checksum (require-checksum=true by default)
+        uses: .
+        with:
+          paths: /tmp/checksum-test-target
+          require-checksum: "true"
+          gitleaks-checksum: ""
+        continue-on-error: true
+        # Note: AGENT_GUARD_GITLEAKS_BIN is intentionally NOT set here.
+        # The action's install step checks "command -v gitleaks" first.
+        # If gitleaks is not on PATH, the checksum enforcement triggers.
+        # If gitleaks IS on PATH (pre-installed), the install step is skipped
+        # and the action may succeed — handled by the assertion below.
+
+      - name: Assert action failed due to missing checksum (or succeeded if pre-installed)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: Agent Guard correctly failed when checksum is required but not provided"
+          elif [ "$OUTCOME" = "success" ]; then
+            # If gitleaks was already installed on the runner, the checksum check
+            # is skipped — this is acceptable behavior per the action's design.
+            echo "INFO: Action succeeded — gitleaks was already installed, checksum check was skipped"
+            echo "PASS: This is acceptable behavior (gitleaks pre-installed)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

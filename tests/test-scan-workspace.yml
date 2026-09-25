@@ -1,0 +1,42 @@
+name: Test scan workspace (default paths)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare mock gitleaks
+        run: |
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks.sh" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Create a clean directory to scan (simulating workspace)
+        run: |
+          mkdir -p /tmp/workspace-scan-target
+          echo "# Project README" > /tmp/workspace-scan-target/README.md
+          echo "version: 1.0.0" > /tmp/workspace-scan-target/package.yaml
+          mkdir -p /tmp/workspace-scan-target/src
+          echo "print('hello world')" > /tmp/workspace-scan-target/src/main.py
+          cd /tmp/workspace-scan-target
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add .
+          git commit -m "Initial commit"
+
+      - id: action
+        name: Run Agent Guard on clean workspace-like directory
+        uses: .
+        with:
+          paths: /tmp/workspace-scan-target
+          require-checksum: "false"
+        env:
+          AGENT_GUARD_GITLEAKS_BIN: ${{ runner.temp }}/mock-bin/gitleaks
+
+      - name: Assert action succeeded (workspace has no secrets)
+        run: |
+          echo "PASS: Agent Guard completed successfully scanning the workspace-like directory"

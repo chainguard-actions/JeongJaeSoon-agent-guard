@@ -1,0 +1,58 @@
+#!/usr/bin/env sh
+set -u
+
+mode=${1:-}
+case "$mode" in
+  stdin)
+    shift
+    report_path=''
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --report-path) shift; report_path=${1:-} ;;
+        --report-path=*) report_path=${1#--report-path=} ;;
+      esac
+      shift
+    done
+    input=$(cat)
+    case "$input" in
+      *AGENT_GUARD_TEST_SECRET*|*"PRIVATE KEY"*)
+        [ -n "$report_path" ] && printf '%s\n' '[{"Secret":"AGENT_GUARD_TEST_SECRET"}]' >"$report_path"
+        printf '%s\n' "Finding: REDACTED"
+        exit 1
+        ;;
+      *)
+        [ -n "$report_path" ] && printf '%s\n' '[]' >"$report_path"
+        exit 0
+        ;;
+    esac
+    ;;
+  dir)
+    shift
+    for arg in "$@"; do
+      case "$arg" in
+        -*|--*) continue ;;
+        *)
+          if [ -f "$arg" ] && grep -Eq 'AGENT_GUARD_TEST_SECRET|PRIVATE KEY' "$arg"; then
+            printf '%s\n' "Finding: REDACTED"
+            exit 1
+          fi
+          if [ -d "$arg" ] && grep -R -E -q 'AGENT_GUARD_TEST_SECRET|PRIVATE KEY' "$arg" 2>/dev/null; then
+            printf '%s\n' "Finding: REDACTED"
+            exit 1
+          fi
+          ;;
+      esac
+    done
+    exit 0
+    ;;
+  version)
+    # Match the surface that bin/agent-guard `check` reads to print a
+    # version line; the value is intentionally fake so it cannot be
+    # mistaken for a real release.
+    printf '%s\n' "8.30.1-mock"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
