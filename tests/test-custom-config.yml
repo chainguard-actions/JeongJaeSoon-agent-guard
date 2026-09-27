@@ -1,0 +1,45 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks to avoid network download
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Verify mock gitleaks is on PATH
+        run: |
+          set -euo pipefail
+          which gitleaks
+          gitleaks version
+
+      - name: Create a minimal custom gitleaks config
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/custom-config"
+          printf 'title = "custom-test-config"\n\n[extend]\nuseDefault = true\n' \
+            > "$GITHUB_WORKSPACE/custom-config/gitleaks.toml"
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/scan-target"
+          echo "# Clean file with no secrets" > "$GITHUB_WORKSPACE/scan-target/README.md"
+
+      - id: scan
+        name: Run Agent Guard with custom config path
+        uses: .
+        with:
+          paths: "scan-target"
+          config-path: "${{ github.workspace }}/custom-config/gitleaks.toml"
+          require-checksum: "false"
+
+      - name: Assert scan with custom config completed successfully
+        run: |
+          echo "PASS: agent-guard scan with custom config completed without finding secrets"

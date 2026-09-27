@@ -1,0 +1,39 @@
+name: Test basic scan (no secrets)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gitleaks to avoid network download
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mock-bin"
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-gitleaks" "$RUNNER_TEMP/mock-bin/gitleaks"
+          chmod +x "$RUNNER_TEMP/mock-bin/gitleaks"
+          echo "$RUNNER_TEMP/mock-bin" >> "$GITHUB_PATH"
+
+      - name: Verify mock gitleaks is on PATH
+        run: |
+          set -euo pipefail
+          which gitleaks
+          gitleaks version
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/clean-scan-target"
+          echo "# Clean repository scan test" > "$GITHUB_WORKSPACE/clean-scan-target/README.md"
+          echo "version=1.0.0" > "$GITHUB_WORKSPACE/clean-scan-target/config.txt"
+
+      - id: scan
+        name: Run Agent Guard scan on clean directory
+        uses: .
+        with:
+          paths: "clean-scan-target"
+          require-checksum: "false"
+
+      - name: Assert scan completed successfully
+        run: |
+          echo "PASS: agent-guard scan completed without finding secrets"

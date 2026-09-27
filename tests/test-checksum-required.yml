@@ -1,0 +1,48 @@
+name: Test checksum required enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure gitleaks is not on PATH so install step is triggered
+        run: |
+          set -euo pipefail
+          # Remove gitleaks from all common locations
+          for loc in /usr/local/bin/gitleaks /usr/bin/gitleaks /bin/gitleaks; do
+            sudo rm -f "$loc" 2>/dev/null || rm -f "$loc" 2>/dev/null || true
+          done
+          # Also remove from RUNNER_TEMP if previously installed
+          rm -f "$RUNNER_TEMP/agent-guard-bin/gitleaks" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/mock-bin/gitleaks" 2>/dev/null || true
+          # Verify gitleaks is gone
+          if command -v gitleaks > /dev/null 2>&1; then
+            FOUND="$(which gitleaks)"
+            echo "gitleaks still found at $FOUND, removing..."
+            sudo rm -f "$FOUND" 2>/dev/null || rm -f "$FOUND" 2>/dev/null || true
+          fi
+          echo "gitleaks removal complete"
+
+      - id: scan
+        name: Run Agent Guard with require-checksum=true and no checksum (should fail)
+        uses: .
+        with:
+          paths: "."
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: ""
+          require-checksum: "true"
+        continue-on-error: true
+
+      - name: Assert action failed due to missing checksum
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when checksum is required but not provided"
+          else
+            echo "FAIL: expected action to fail when require-checksum=true and no checksum given, got outcome=$OUTCOME"
+            exit 1
+          fi
