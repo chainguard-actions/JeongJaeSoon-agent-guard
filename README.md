@@ -39,6 +39,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v3.5.3 | [`v3.5.3`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.3) | [`6e14bae`](https://github.com/JeongJaeSoon/agent-guard/commit/6e14baed9fbd3fb954207fc5804cdaa5d94cadd1) |
 | v3.5.4 | [`v3.5.4`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.4) | [`3de9346`](https://github.com/JeongJaeSoon/agent-guard/commit/3de9346f97c8ff6dc794db37c0afd8b4b758cf73) |
 | v3.5.5 | [`v3.5.5`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.5) | [`0a09aff`](https://github.com/JeongJaeSoon/agent-guard/commit/0a09affce1acecb41d7cb755cf107bf152f91f27) |
+| v3.5.6 | [`v3.5.6`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.5.6) | [`ab7d620`](https://github.com/JeongJaeSoon/agent-guard/commit/ab7d6205b7aae18f7d7697b6c66a1425032bc1ff) |
 
 ## Privacy
 
