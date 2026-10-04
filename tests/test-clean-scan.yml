@@ -1,0 +1,35 @@
+name: Test clean scan (no secrets detected)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create a clean directory with no secrets to scan
+      - name: Create clean test directory
+        run: |
+          mkdir -p /tmp/clean-test-dir
+          echo "# Hello World" > /tmp/clean-test-dir/README.md
+          echo "name: my-project" > /tmp/clean-test-dir/config.yaml
+          echo "version: 1.0.0" >> /tmp/clean-test-dir/config.yaml
+
+      # Scan the clean directory; use require-checksum=false for local experimentation
+      - id: action
+        uses: .
+        with:
+          paths: "/tmp/clean-test-dir"
+          gitleaks-version: "8.30.1"
+          require-checksum: "false"
+
+      - name: Assert scan succeeded (no secrets found)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected clean scan to succeed, got: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: clean scan completed successfully"

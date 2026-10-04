@@ -1,0 +1,34 @@
+name: Test custom gitleaks config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Create a clean directory to scan
+      - name: Create clean test directory
+        run: |
+          mkdir -p /tmp/custom-config-test
+          echo "# Just a readme" > /tmp/custom-config-test/README.md
+
+      # Use the bundled gitleaks config from the action itself as the custom config
+      - id: action
+        uses: .
+        with:
+          paths: "/tmp/custom-config-test"
+          gitleaks-version: "8.30.1"
+          require-checksum: "false"
+          config-path: "${{ github.workspace }}/plugins/agent-guard/config/gitleaks.toml"
+
+      - name: Assert scan with custom config succeeded
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected scan with custom config to succeed on clean directory, got: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: scan with custom config completed successfully"
