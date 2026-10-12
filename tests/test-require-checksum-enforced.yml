@@ -1,0 +1,51 @@
+name: Test require-checksum enforcement
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check if gitleaks is pre-installed
+        id: check-gitleaks
+        run: |
+          if command -v gitleaks > /dev/null 2>&1; then
+            echo "preinstalled=true" >> "$GITHUB_OUTPUT"
+            echo "gitleaks is already installed at $(which gitleaks)"
+          else
+            echo "preinstalled=false" >> "$GITHUB_OUTPUT"
+            echo "gitleaks is not pre-installed"
+          fi
+
+      - name: Create a clean directory to scan (in case gitleaks is pre-installed)
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/checksum-test-target"
+          echo "# Clean file for checksum test" > "$GITHUB_WORKSPACE/checksum-test-target/README.md"
+
+      - id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/checksum-test-target"
+          gitleaks-version: "8.30.1"
+          gitleaks-checksum: ""
+          require-checksum: "true"
+        continue-on-error: true
+
+      - name: Assert action fails when checksum is required but missing (and gitleaks not pre-installed)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PREINSTALLED: ${{ steps.check-gitleaks.outputs.preinstalled }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "gitleaks_preinstalled: $PREINSTALLED"
+          if [ "$PREINSTALLED" = "true" ]; then
+            # If gitleaks was already installed, the install step is skipped
+            # and the action may succeed (no checksum needed for pre-installed binary)
+            echo "PASS: gitleaks was pre-installed, checksum enforcement skipped (expected)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed when require-checksum=true and no checksum provided"
+          else
+            echo "FAIL: expected action to fail when require-checksum=true and gitleaks-checksum is empty"
+            exit 1
+          fi

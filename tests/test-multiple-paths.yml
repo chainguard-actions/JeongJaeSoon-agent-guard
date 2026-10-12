@@ -1,0 +1,55 @@
+name: Test multiple paths scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure setsid is available (required by agent-guard)
+        run: |
+          if ! command -v setsid > /dev/null 2>&1; then
+            echo "setsid not found, installing util-linux..."
+            sudo apt-get install -y util-linux 2>/dev/null || true
+          fi
+          setsid --version || perl -e 'print "perl available\n"' || true
+
+      - name: Pre-install gitleaks to avoid download
+        run: |
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create multiple clean directories to scan inside workspace
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/scan-dir-a"
+          echo "# Directory A" > "$GITHUB_WORKSPACE/scan-dir-a/README.md"
+          echo "x = 1" > "$GITHUB_WORKSPACE/scan-dir-a/config.py"
+
+          mkdir -p "$GITHUB_WORKSPACE/scan-dir-b"
+          echo "# Directory B" > "$GITHUB_WORKSPACE/scan-dir-b/README.md"
+          echo "y = 2" > "$GITHUB_WORKSPACE/scan-dir-b/config.py"
+
+      - id: action
+        uses: .
+        with:
+          paths: "${{ github.workspace }}/scan-dir-a ${{ github.workspace }}/scan-dir-b"
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "Action completed successfully scanning multiple paths"
+          echo "PASS"
