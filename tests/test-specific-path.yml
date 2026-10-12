@@ -1,0 +1,45 @@
+name: Test scanning a specific path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install gitleaks before action runs (to avoid download)
+        run: |
+          set -euo pipefail
+          VERSION="8.30.1"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+          esac
+          ARCHIVE="gitleaks_${VERSION}_${OS}_${ARCH}.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/${ARCHIVE}"
+          TMP="$(mktemp -d)"
+          curl -fsSL "$URL" -o "$TMP/$ARCHIVE"
+          tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
+          sudo mv "$TMP/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create a clean test directory to scan
+        run: |
+          mkdir -p "$RUNNER_TEMP/scan-target"
+          echo "# Hello World" > "$RUNNER_TEMP/scan-target/README.md"
+          echo "This is a clean file with no secrets." >> "$RUNNER_TEMP/scan-target/README.md"
+          echo "SCAN_PATH=$RUNNER_TEMP/scan-target" >> "$GITHUB_ENV"
+
+      - id: scan
+        name: Run Agent Guard on specific path
+        uses: .
+        with:
+          paths: ${{ env.SCAN_PATH }}
+          require-checksum: "false"
+
+      - name: Assert scan succeeded on specific path
+        run: |
+          echo "PASS: Agent Guard scan completed on specific path without detecting secrets"
