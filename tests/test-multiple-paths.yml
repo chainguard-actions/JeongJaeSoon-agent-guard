@@ -1,0 +1,46 @@
+name: Test scanning multiple paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install gitleaks
+        run: |
+          version="8.30.1"
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64|amd64) arch="x64" ;;
+            arm64|aarch64) arch="arm64" ;;
+          esac
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" -o "$tmp/$archive"
+          tar -xzf "$tmp/$archive" -C "$tmp"
+          sudo mv "$tmp/gitleaks" /usr/local/bin/gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Create multiple clean directories to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/multi-path-a"
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/multi-path-b"
+          echo "# Project A" > "$GITHUB_WORKSPACE/tests/fixtures/multi-path-a/README.md"
+          echo "# Project B" > "$GITHUB_WORKSPACE/tests/fixtures/multi-path-b/README.md"
+          echo "key: value" > "$GITHUB_WORKSPACE/tests/fixtures/multi-path-a/config.yml"
+          echo "key: value" > "$GITHUB_WORKSPACE/tests/fixtures/multi-path-b/config.yml"
+
+      - id: action
+        name: Run Agent Guard on multiple paths
+        uses: .
+        with:
+          paths: "tests/fixtures/multi-path-a tests/fixtures/multi-path-b"
+          require-checksum: "false"
+
+      - name: Assert action succeeded scanning multiple paths
+        run: |
+          echo "PASS: Agent Guard completed successfully scanning multiple paths"

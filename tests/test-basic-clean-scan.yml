@@ -1,0 +1,25 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/clean-dir"
+          echo "# Hello World" > "$GITHUB_WORKSPACE/tests/fixtures/clean-dir/README.md"
+          echo "name: my-project" > "$GITHUB_WORKSPACE/tests/fixtures/clean-dir/config.yml"
+
+      - id: action
+        name: Run Agent Guard on clean directory
+        uses: .
+        with:
+          paths: tests/fixtures/clean-dir
+          require-checksum: "false"
+
+      - name: Assert action succeeded (no secrets found)
+        run: |
+          echo "PASS: Agent Guard completed without finding secrets in clean directory"
