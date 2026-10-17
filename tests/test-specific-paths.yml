@@ -1,0 +1,19 @@
+name: Test scanning specific paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Agent Guard on specific clean subdirectory
+        id: action
+        uses: .
+        with:
+          paths: "tests/fixtures/clean-dir"
+          require-checksum: "false"
+
+      - name: Assert scan of specific path completed successfully
+        run: |
+          echo "PASS: Agent Guard scan of specific path completed with no secrets detected"

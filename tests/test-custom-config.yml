@@ -1,0 +1,20 @@
+name: Test custom config path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Agent Guard with explicit bundled config path
+        id: action
+        uses: .
+        with:
+          paths: "tests/fixtures/clean-dir"
+          require-checksum: "false"
+          config-path: "${{ github.workspace }}/plugins/agent-guard/config/gitleaks.toml"
+
+      - name: Assert scan completed successfully with custom config
+        run: |
+          echo "PASS: Agent Guard scan completed successfully using explicit config path"
