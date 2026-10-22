@@ -1,0 +1,33 @@
+name: Test multiple whitespace-separated paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create clean scan targets
+        run: |
+          mkdir -p agent-guard-a agent-guard-b
+          printf 'alpha content\n' > agent-guard-a/a.txt
+          printf 'beta content\n' > agent-guard-b/b.txt
+      - id: action
+        uses: .
+        with:
+          paths: "agent-guard-a   agent-guard-b"
+          require-checksum: "false"
+      - name: Assert scan succeeded and gitleaks available
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks not on PATH after action"
+            exit 1
+          fi
+          gitleaks version || true
+          echo "PASS"
