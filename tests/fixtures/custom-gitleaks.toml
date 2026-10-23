@@ -1,0 +1,7 @@
+title = "agent-guard-test-custom"
+
+[[rules]]
+id = "agent-guard-test-canary"
+description = "Test canary marker"
+regex = '''AGCANARY_[0-9]{8}'''
+keywords = ["agcanary_"]
