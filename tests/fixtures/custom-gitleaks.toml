@@ -1,0 +1,7 @@
+title = "agent-guard test custom config"
+
+[[rules]]
+id = "agent-guard-test-marker"
+description = "Test marker token used by agent-guard action tests"
+regex = '''AGENTGUARDMARKER[0-9]{8}'''
+keywords = ["agentguardmarker"]
