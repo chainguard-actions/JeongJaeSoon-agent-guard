@@ -1,0 +1,61 @@
+name: Test secret leak is detected
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Resolve gitleaks checksum
+        id: sum
+        run: |
+          set -euo pipefail
+          VERSION=8.30.1
+          case "$(uname -m)" in
+            x86_64|amd64) arch=x64 ;;
+            arm64|aarch64) arch=arm64 ;;
+          esac
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_checksums.txt" -o /tmp/gl-sums.txt
+          sha=$(awk -v a="gitleaks_${VERSION}_linux_${arch}.tar.gz" '$2==a{print $1}' /tmp/gl-sums.txt)
+          echo "sha: $sha"
+          [ -n "$sha" ] || { echo "FAIL: could not resolve checksum"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Create clean and leaky directories
+        run: |
+          mkdir -p ag-clean ag-leak
+          printf 'hello world\n' > ag-clean/readme.txt
+          # Build a fake GitHub PAT at runtime so this workflow file stays clean.
+          prefix="gh""p_"
+          body="R7xQ2mZpL9vK4tNw8YbC3sHd6FjU1aEo5GiT"
+          printf 'token = "%s%s"\n' "$prefix" "$body" > ag-leak/config.env
+          printf 'AWS_ACCESS_KEY_ID=%s%s\n' "AKIA" "Z7QW3RTY5UIOPL2K" >> ag-leak/config.env
+          git add ag-clean ag-leak || true
+      - id: clean
+        name: Run action on clean dir (installs gitleaks)
+        uses: .
+        with:
+          paths: ag-clean
+          gitleaks-checksum: ${{ steps.sum.outputs.sha }}
+      - id: action
+        name: Run action on leaky dir
+        uses: .
+        continue-on-error: true
+        with:
+          paths: ag-leak
+          gitleaks-checksum: ${{ steps.sum.outputs.sha }}
+      - name: Assert leak caused failure
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean outcome: $CLEAN"
+          echo "leak outcome: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected leak scan to fail"
+            exit 1
+          fi
+          echo "PASS"

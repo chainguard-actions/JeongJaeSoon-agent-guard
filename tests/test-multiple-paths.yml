@@ -1,0 +1,42 @@
+name: Test multiple whitespace-separated paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Resolve gitleaks checksum
+        id: sum
+        run: |
+          set -euo pipefail
+          VERSION=8.30.1
+          case "$(uname -m)" in
+            x86_64|amd64) arch=x64 ;;
+            arm64|aarch64) arch=arm64 ;;
+          esac
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_checksums.txt" -o /tmp/gl-sums.txt
+          sha=$(awk -v a="gitleaks_${VERSION}_linux_${arch}.tar.gz" '$2==a{print $1}' /tmp/gl-sums.txt)
+          [ -n "$sha" ] || { echo "FAIL: could not resolve checksum"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Create directories
+        run: |
+          mkdir -p ag-one ag-two
+          printf 'alpha\n' > ag-one/a.txt
+          printf 'beta\n' > ag-two/b.txt
+          git add ag-one ag-two || true
+      - id: action
+        uses: .
+        with:
+          paths: "ag-one   ag-two"
+          gitleaks-checksum: ${{ steps.sum.outputs.sha }}
+      - name: Assert success
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          echo "PASS"
