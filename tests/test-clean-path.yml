@@ -1,0 +1,32 @@
+name: Test clean path scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare clean directory
+        run: |
+          rm -rf ag-clean
+          mkdir -p ag-clean
+          printf 'hello world\nThis file has no secrets.\n' > ag-clean/readme.txt
+          printf 'def add(a, b):\n    return a + b\n' > ag-clean/math.py
+      - id: action
+        uses: .
+        with:
+          paths: ag-clean
+          require-checksum: "false"
+      - name: Assert scan succeeded
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Cleanup
+        if: always()
+        run: rm -rf ag-clean

@@ -1,0 +1,57 @@
+name: Test custom gitleaks config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare custom config and directories
+        run: |
+          rm -rf ag-custom ag-custom-clean ag-custom-config
+          mkdir -p ag-custom ag-custom-clean ag-custom-config
+          cat > ag-custom-config/gitleaks.toml <<'EOF'
+          title = "agent-guard-test-custom"
+
+          [[rules]]
+          id = "agtest-custom-marker"
+          description = "Custom marker used by the test suite"
+          regex = '''AGTESTMARKER[0-9]{8}'''
+          keywords = ["agtestmarker"]
+          EOF
+          echo "plain text only" > ag-custom-clean/ok.txt
+          printf 'marker = %s%s\n' "AGTEST""MARKER" "48151623" > ag-custom/hit.txt
+      - name: Custom config on clean dir (must succeed)
+        id: clean
+        uses: .
+        with:
+          paths: ag-custom-clean
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/ag-custom-config/gitleaks.toml
+      - name: Custom config on dir with custom marker (must fail)
+        id: action
+        uses: .
+        continue-on-error: true
+        with:
+          paths: ag-custom
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/ag-custom-config/gitleaks.toml
+      - name: Assert custom rule was applied
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean: $CLEAN"
+          echo "outcome: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan with custom config should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: custom rule should have flagged the marker"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Cleanup
+        if: always()
+        run: rm -rf ag-custom ag-custom-clean ag-custom-config

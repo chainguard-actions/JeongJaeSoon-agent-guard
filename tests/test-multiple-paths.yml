@@ -1,0 +1,51 @@
+name: Test multiple whitespace-separated paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare directories
+        run: |
+          rm -rf ag-multi-a ag-multi-b
+          mkdir -p ag-multi-a ag-multi-b
+          echo "first clean file" > ag-multi-a/a.txt
+          echo "second clean file" > ag-multi-b/b.txt
+      - name: Clean multi-path scan (must succeed)
+        id: clean
+        uses: .
+        with:
+          paths: ag-multi-a ag-multi-b
+          require-checksum: "false"
+      - name: Put a fake token in the second path only
+        run: |
+          prefix="gh""p_"
+          body="Zq9Xw8Vu7T""s6Rr5Qp4On""3Ml2Kk1Jj0""HhGgFf"
+          printf 'token: %s%s\n' "$prefix" "$body" > ag-multi-b/leak.txt
+      - name: Multi-path scan with secret in second path (must fail)
+        id: dirty
+        uses: .
+        continue-on-error: true
+        with:
+          paths: ag-multi-a ag-multi-b
+          require-checksum: "false"
+      - name: Assert outcomes
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          DIRTY: ${{ steps.dirty.outcome }}
+        run: |
+          echo "clean: $CLEAN"
+          echo "dirty: $DIRTY"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan should succeed"
+            exit 1
+          fi
+          if [ "$DIRTY" != "failure" ]; then
+            echo "FAIL: second path should have been scanned and flagged"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Cleanup
+        if: always()
+        run: rm -rf ag-multi-a ag-multi-b
