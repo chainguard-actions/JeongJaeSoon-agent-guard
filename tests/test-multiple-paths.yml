@@ -1,0 +1,45 @@
+name: Test multiple whitespace-separated paths, one containing a secret
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create two scan targets
+        run: |
+          rm -rf scan-a scan-b
+          mkdir -p scan-a scan-b
+          echo "clean content" > scan-a/a.txt
+          tok="ghp_$(head -c 4000 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 36)"
+          printf 'token: %s\n' "$tok" > scan-b/b.yml
+      - id: clean
+        name: Scan only the clean paths
+        uses: .
+        with:
+          paths: "scan-a  scan-a/a.txt"
+          require-checksum: "false"
+      - id: action
+        name: Scan both paths (second contains a secret)
+        uses: .
+        continue-on-error: true
+        with:
+          paths: |
+            scan-a
+            scan-b
+          require-checksum: "false"
+      - name: Assert results
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean: $CLEAN both: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean paths scan should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: scanning the second path should detect the secret"
+            exit 1
+          fi
+          echo "PASS"

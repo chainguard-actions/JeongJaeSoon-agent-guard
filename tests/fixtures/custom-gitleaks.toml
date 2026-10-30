@@ -1,0 +1,7 @@
+title = "agent-guard act test config"
+
+[[rules]]
+id = "agent-guard-act-test-token"
+description = "Synthetic token used only by the act tests"
+regex = '''AGTEST_[A-Z0-9]{24}'''
+keywords = ["agtest_"]
