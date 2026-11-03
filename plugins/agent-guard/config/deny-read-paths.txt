@@ -1,0 +1,85 @@
+# Shell case patterns. Blank lines and lines starting with # are ignored.
+.env*
+# Alternate dotenv layouts. Broad runtime families cover deployment names such
+# as local, production, preview, UAT, or future variants without a brittle
+# marker list. The shared code narrowly exempts explicit templates and common
+# source-module suffixes from these environment-only defaults.
+*.env
+*.env.*
+*.envrc
+*.envrc.*
+env.*
+envrc.*
+.flaskenv
+.flaskenv.*
+*.pem
+*.key
+*.pfx
+*.p12
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+.aws/credentials
+.aws/config
+.npmrc
+.pypirc
+.netrc
+.docker/config.json
+.config/gh/hosts.yml
+.git-credentials
+.ssh/config
+.ssh/id_*
+.kube/config
+.config/gcloud/application_default_credentials.json
+.config/gcloud/credentials.db
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+service-account*.json
+gcp-sa*.json
+# Reading the process environment is equivalent to `env`/`printenv`. The Bash
+# variant (incl. variable PIDs like /proc/$$/environ) is handled in
+# deny-bash-patterns.txt, which the deny-read glob cannot match.
+/proc/*/environ
+# Additional high-value secret material (keystores, DB/Vault creds, IaC state).
+*.p8
+*.jks
+*.keystore
+.pgpass
+.my.cnf
+*.tfstate
+*.tfvars
+.vault-token
+.dev.vars
+.dev.vars.*
+# Package-manager credential stores. These carry plaintext auth for Bundler
+# (BUNDLE_<HOST>), RubyGems, Cargo, Composer (github-oauth), Maven server
+# passwords, Gradle publish tokens, pip index-url credentials, and the Poetry
+# http-basic fallback. A bare `auth.json` glob is deliberately NOT
+# listed: the name is too common in fixtures; only Composer's home locations
+# are covered. The explicit XDG path covers the newer RubyGems location
+# ~/.local/share/gem/credentials that the `.gem` glob cannot match, without
+# the over-block a dotless `gem/credentials` suffix would cause on a vendored
+# `gem/` directory.
+.bundle/config
+.gem/credentials
+.local/share/gem/credentials
+.cargo/credentials*
+.composer/auth.json
+.config/composer/auth.json
+.m2/settings.xml
+.gradle/gradle.properties
+pip.conf
+pypoetry/auth.toml
+# Bun's dot config holds registry tokens in [install.registry]. Like every
+# entry here this is a basename rule (matches `.bunfig.toml` in any directory),
+# but the dotless project-root `bunfig.toml` is the commonly committed,
+# usually-secretless form and stays readable. uv and pnpm need no path here: uv
+# authenticates via env (UV_PUBLISH_TOKEN/UV_INDEX_*) and .netrc, and pnpm
+# reads .npmrc — both already covered.
+.bunfig.toml
+# Terraform CLI credentials file: credentials "host" { token = "..." }.
+.terraformrc
+terraform.rc

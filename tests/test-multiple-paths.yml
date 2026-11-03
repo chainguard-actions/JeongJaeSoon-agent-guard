@@ -1,0 +1,45 @@
+name: Test multiple paths where one contains a secret
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create two scan targets
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/ag-multi-a" "$GITHUB_WORKSPACE/ag-multi-b"
+          mkdir -p "$GITHUB_WORKSPACE/ag-multi-a" "$GITHUB_WORKSPACE/ag-multi-b"
+          echo "plain text" > "$GITHUB_WORKSPACE/ag-multi-a/one.txt"
+          suffix="$(head -c 4000 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c 36)"
+          printf 'TOKEN=ghp_%s\n' "$suffix" > "$GITHUB_WORKSPACE/ag-multi-b/two.env"
+      - id: clean
+        name: Scan only the clean path (two-path form with both clean dirs)
+        uses: .
+        with:
+          paths: ag-multi-a ag-multi-a/one.txt
+          require-checksum: "false"
+      - id: action
+        name: Scan both paths, second has a secret
+        uses: .
+        continue-on-error: true
+        with:
+          paths: |
+            ag-multi-a
+            ag-multi-b
+          require-checksum: "false"
+      - name: Assert outcomes
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean: $CLEAN, multi: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean multi-path scan should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: secret in second path should be detected"
+            exit 1
+          fi
+          echo "PASS"

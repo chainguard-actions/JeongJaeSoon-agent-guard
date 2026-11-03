@@ -1,0 +1,55 @@
+name: Test custom gitleaks config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create custom config and targets
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/ag-cfg"
+          mkdir -p "$GITHUB_WORKSPACE/ag-cfg/clean" "$GITHUB_WORKSPACE/ag-cfg/marked"
+          cat > "$GITHUB_WORKSPACE/ag-cfg/custom.toml" <<'EOF'
+          title = "custom-test"
+
+          [extend]
+          useDefault = true
+
+          [[rules]]
+          id = "agent-guard-test-marker"
+          description = "Custom test marker"
+          regex = '''AGTESTMARKER_[0-9]{8}'''
+          keywords = ["agtestmarker_"]
+          EOF
+          echo "plain text only" > "$GITHUB_WORKSPACE/ag-cfg/clean/a.txt"
+          echo "value = AGTESTMARKER_12345678" > "$GITHUB_WORKSPACE/ag-cfg/marked/b.txt"
+          cat "$GITHUB_WORKSPACE/ag-cfg/custom.toml"
+      - id: clean
+        uses: .
+        with:
+          paths: ag-cfg/clean
+          config-path: ${{ github.workspace }}/ag-cfg/custom.toml
+          require-checksum: "false"
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          paths: ag-cfg/marked
+          config-path: ${{ github.workspace }}/ag-cfg/custom.toml
+          require-checksum: "false"
+      - name: Assert custom rule was applied
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean: $CLEAN, marked: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan with custom config should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: custom rule should detect the marker"
+            exit 1
+          fi
+          echo "PASS"
