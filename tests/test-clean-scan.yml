@@ -1,0 +1,44 @@
+name: Test clean scan with pinned checksum
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Compute gitleaks archive checksum
+        id: sum
+        run: |
+          set -euo pipefail
+          version=8.30.1
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          case "$(uname -m)" in
+            x86_64|amd64) arch=x64 ;;
+            arm64|aarch64) arch=arm64 ;;
+          esac
+          archive="gitleaks_${version}_${os}_${arch}.tar.gz"
+          tmp="$(mktemp -d)"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}" -o "$tmp/$archive"
+          sum="$(sha256sum "$tmp/$archive" | awk '{print $1}')"
+          echo "checksum: $sum"
+          echo "checksum=$sum" >> "$GITHUB_OUTPUT"
+      - id: action
+        uses: .
+        with:
+          paths: tests/fixtures/clean
+          gitleaks-checksum: ${{ steps.sum.outputs.checksum }}
+      - name: Assert action succeeded and gitleaks is available
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks not on PATH after action"
+            exit 1
+          fi
+          gitleaks version
+          echo "PASS"
