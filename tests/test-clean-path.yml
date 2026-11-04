@@ -1,0 +1,29 @@
+name: Test clean path scan passes
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create clean directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/clean-dir"
+          printf 'hello world\nthis file has no secrets\n' > "$RUNNER_TEMP/clean-dir/readme.txt"
+          printf 'def add(a, b):\n    return a + b\n' > "$RUNNER_TEMP/clean-dir/code.py"
+      - id: action
+        uses: .
+        with:
+          paths: ${{ runner.temp }}/clean-dir
+          require-checksum: "false"
+      - name: Assert success
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          command -v gitleaks || ls "$RUNNER_TEMP/agent-guard-bin/gitleaks" || { echo "FAIL: gitleaks not installed"; exit 1; }
+          echo "PASS"
