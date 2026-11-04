@@ -57,6 +57,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v3.6.8 | [`v3.6.8`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.6.8) | [`c73d07f`](https://github.com/JeongJaeSoon/agent-guard/commit/c73d07f5f5900d009d9ed65a8725bec4821bc998) | [`HARDENING.md`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/blob/v3.6.8/HARDENING.md) |
 | v3.6.9 | [`v3.6.9`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.6.9) | [`e1f3b12`](https://github.com/JeongJaeSoon/agent-guard/commit/e1f3b12e80f85e0c47bd7db0c52d04161817627c) | [`HARDENING.md`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/blob/v3.6.9/HARDENING.md) |
 | v3.7.0 | [`v3.7.0`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.7.0) | [`e709445`](https://github.com/JeongJaeSoon/agent-guard/commit/e709445fb6fce9ade8cbbd2d6bcf2940e48da178) | [`HARDENING.md`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/blob/v3.7.0/HARDENING.md) |
+| v3.7.1 | [`v3.7.1`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/tree/v3.7.1) | [`d00b488`](https://github.com/JeongJaeSoon/agent-guard/commit/d00b4882c55704e5d83899ffd3820946aa9c15fa) | [`HARDENING.md`](https://github.com/chainguard-actions/JeongJaeSoon-agent-guard/blob/v3.7.1/HARDENING.md) |
 
 ## Privacy
 
