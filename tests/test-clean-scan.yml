@@ -1,0 +1,33 @@
+name: Test clean path scan succeeds
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p clean-dir
+          printf 'hello world\nthis file contains no secrets\n' > clean-dir/readme.txt
+          printf 'def add(a, b):\n    return a + b\n' > clean-dir/math.py
+      - id: action
+        uses: .
+        with:
+          paths: clean-dir
+          require-checksum: "false"
+      - name: Assert action succeeded and gitleaks is available
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks not on PATH after action"
+            exit 1
+          fi
+          gitleaks version
+          echo "PASS"
