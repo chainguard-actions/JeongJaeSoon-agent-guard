@@ -1,0 +1,40 @@
+name: Test custom config-path is honored
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a file with the custom marker
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/marker-dir"
+          m="AGTEST""MARKER"
+          echo "value: ${m}12345678" > "$GITHUB_WORKSPACE/marker-dir/data.txt"
+      - id: default
+        uses: .
+        with:
+          paths: marker-dir
+          require-checksum: "false"
+      - id: custom
+        uses: .
+        continue-on-error: true
+        with:
+          paths: marker-dir
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml
+      - name: Assert custom rule only fires with custom config
+        env:
+          DEFAULT: ${{ steps.default.outcome }}
+          CUSTOM: ${{ steps.custom.outcome }}
+        run: |
+          echo "default: $DEFAULT custom: $CUSTOM"
+          if [ "$DEFAULT" != "success" ]; then
+            echo "FAIL: bundled config should not flag the test marker"
+            exit 1
+          fi
+          if [ "$CUSTOM" != "failure" ]; then
+            echo "FAIL: custom config should flag the test marker"
+            exit 1
+          fi
+          echo "PASS"

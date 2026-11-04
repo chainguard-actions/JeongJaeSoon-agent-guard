@@ -1,0 +1,40 @@
+name: Test multiple whitespace-separated paths are all scanned
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create second clean dir and a leaky dir
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/clean-two" "$GITHUB_WORKSPACE/leaky-two"
+          echo "nothing to see here" > "$GITHUB_WORKSPACE/clean-two/notes.txt"
+          prefix="AK""IA"
+          printf 'aws = %sQ7WZR3TN9KPL2XVB\n' "$prefix" > "$GITHUB_WORKSPACE/leaky-two/creds.txt"
+      - id: clean
+        uses: .
+        with:
+          paths: tests/fixtures/clean clean-two
+          require-checksum: "false"
+      - id: mixed
+        uses: .
+        continue-on-error: true
+        with:
+          paths: tests/fixtures/clean clean-two leaky-two
+          require-checksum: "false"
+      - name: Assert outcomes
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          MIXED: ${{ steps.mixed.outcome }}
+        run: |
+          echo "clean: $CLEAN mixed: $MIXED"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: scanning only clean paths should succeed"
+            exit 1
+          fi
+          if [ "$MIXED" != "failure" ]; then
+            echo "FAIL: secret in the last path should fail the scan"
+            exit 1
+          fi
+          echo "PASS"

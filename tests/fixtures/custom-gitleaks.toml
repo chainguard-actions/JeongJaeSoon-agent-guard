@@ -1,0 +1,7 @@
+title = "agent-guard-test-custom"
+
+[[rules]]
+id = "agent-guard-test-marker"
+description = "Test-only marker rule"
+regex = '''AGTESTMARKER[0-9]{8}'''
+keywords = ["agtestmarker"]
