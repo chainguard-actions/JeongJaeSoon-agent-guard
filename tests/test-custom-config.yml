@@ -1,0 +1,46 @@
+name: Test custom gitleaks config-path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create content
+        run: |
+          rm -rf .ag-test-clean .ag-test-custom
+          mkdir -p .ag-test-clean .ag-test-custom
+          printf 'Plain text only.\n' > .ag-test-clean/a.txt
+          p="AGTESTTOKEN"
+          printf 'value: %s-%s\n' "$p" "Q7W2E9R4T1Y8U3I6O5P0" > .ag-test-custom/b.txt
+      - id: clean
+        name: Clean scan with custom config
+        uses: .
+        with:
+          paths: .ag-test-clean
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml
+      - id: action
+        name: Scan custom-token content with custom config
+        uses: .
+        continue-on-error: true
+        with:
+          paths: .ag-test-custom
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml
+      - name: Assert custom rule was applied
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "clean outcome: $CLEAN"
+          echo "custom outcome: $OUTCOME"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan with custom config should succeed"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: custom rule should have detected the token"
+            exit 1
+          fi
+          echo "PASS"
