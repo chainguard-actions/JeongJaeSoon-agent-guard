@@ -1,0 +1,82 @@
+{
+  "sh_squote": {
+    "relative_lines": [
+      2,
+      3,
+      4
+    ],
+    "body_sha256": "6e9d8723e09270443ee0165be9c4b0a16e5c30452b8a1db3b51463a05719806e"
+  },
+  "version_newer": {
+    "relative_lines": [
+      2
+    ],
+    "body_sha256": "dacb611410a15ef0a80135e95914ba25852ffe641dfbe32970174410b8d6e835"
+  },
+  "frame_json_string_leaves": {
+    "relative_lines": [
+      2
+    ],
+    "body_sha256": "44b0a9ed5fdfd4b07a08545a7f3380bb6105a4c65cd00a0018ab140c8f5cba6c"
+  },
+  "frame_plaintext_leaf": {
+    "relative_lines": [
+      2
+    ],
+    "body_sha256": "5d1c542c7dd92c261658007693d02e1e96e6a83eca343aa4547f568d2d109d7e"
+  },
+  "secretish_env_values": {
+    "relative_lines": [
+      2,
+      3
+    ],
+    "body_sha256": "d1d3103bba7401ad1e537b20c75b6e8ac7e69d1bf0c4e2b29048993d187784e0"
+  },
+  "deny_path_char_hex_pattern": {
+    "relative_lines": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "body_sha256": "f4ce1b53ae44b375495ba95449f8da4b201023086a6026fd455439f45a53875d"
+  },
+  "deny_path_shell_expansion_char_pattern": {
+    "relative_lines": [
+      2,
+      3,
+      5,
+      7,
+      9,
+      10,
+      11,
+      13,
+      14,
+      16,
+      20,
+      21,
+      23
+    ],
+    "body_sha256": "3941908a46a65fc6029c69e1d97f6bfc54e74e5a840d92719d6115f731bf0f68"
+  },
+  "deny_path_pin_char_pattern": {
+    "relative_lines": [
+      2,
+      3,
+      5
+    ],
+    "body_sha256": "c0fddfee98d5116dec4e3959392725a10880fcfd2434370f8d4da0c39b178eca"
+  }
+}
