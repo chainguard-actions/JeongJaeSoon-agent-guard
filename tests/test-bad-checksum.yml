@@ -1,0 +1,40 @@
+name: Test wrong checksum is rejected
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Detect preinstalled gitleaks
+        id: pre
+        run: |
+          mkdir -p clean-target
+          echo "nothing to see" > clean-target/a.txt
+          if command -v gitleaks >/dev/null; then
+            echo "preinstalled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "preinstalled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          paths: clean-target
+          gitleaks-checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+      - name: Assert outcome
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PRE: ${{ steps.pre.outputs.preinstalled }}
+        run: |
+          echo "outcome: $OUTCOME preinstalled: $PRE"
+          if [ "$PRE" = "true" ]; then
+            [ "$OUTCOME" = "success" ] || { echo "FAIL: expected success with preinstalled gitleaks"; exit 1; }
+          else
+            [ "$OUTCOME" = "failure" ] || { echo "FAIL: expected checksum mismatch failure"; exit 1; }
+            if command -v gitleaks >/dev/null; then
+              echo "FAIL: gitleaks should not have been installed"
+              exit 1
+            fi
+          fi
+          echo "PASS"
