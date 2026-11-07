@@ -16,11 +16,11 @@ Action **JeongJaeSoon--agent-guard/v3.6.3** was hardened automatically. 1 findin
 
 ### script-injection (severity: high)
 
-Rule (b) violation in the 'Run Agent Guard' step of action.yml: the env var `AGENT_GUARD_PATHS` is sourced from `${{ inputs.paths }}` (attacker-controlled) and then expanded **unquoted** in the run script as `$AGENT_GUARD_PATHS`. The script even suppresses the shellcheck warning with `# shellcheck disable=SC2086`. An attacker can supply a `paths` input containing shell metacharacters (`;`, `|`, `&`, `$(...)`, backticks, glob characters, etc.) that the shell will interpret when the unquoted variable expands, enabling command injection. Offending line: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`
+Sub-rule (b) is violated: an env var holding workflow-controlled data is expanded without double quotes. The 'Run Agent Guard' step sets AGENT_GUARD_PATHS from ${{ inputs.paths }} and runs: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS` (shellcheck SC2086 is turned off). Because the expansion is unquoted, the shell splits the value on whitespace and expands glob characters from attacker-supplied input. Fix: split the value into an array safely (e.g. `read -ra paths <<< "$AGENT_GUARD_PATHS"` with globbing disabled via `set -f`) and pass "${paths[@]}".
 
 Locations:
 
-- `action.yml:103`
+- `action.yml:105`
 
 ## Iteration Notes
 
@@ -30,5 +30,5 @@ Locations:
 
 **Notes:**
 
-Fixed the script injection vulnerability in the 'Run Agent Guard' step of action.yml. The unquoted `$AGENT_GUARD_PATHS` expansion (with a shellcheck disable comment) was replaced with a safe xargs-based tokenization approach: the whitespace-separated paths are split into a bash array using `printf '%s' "$AGENT_GUARD_PATHS" | xargs -r printf '%s\0'` piped through a NUL-delimited read loop, then passed to the agent-guard binary as properly quoted array elements `"${paths[@]}"`.
+In action.yml, the 'Run Agent Guard' step no longer expands $AGENT_GUARD_PATHS unquoted. It now splits the value into an array with `read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true`, guarded by a non-empty check. This splits on whitespace and newlines the same way upstream did, and does no globbing or evaluation. The array is passed as ${paths[@]+"${paths[@]}"} so an empty value under set -u on bash 3.2 (macOS) doesn't fail. I also removed the shellcheck SC2086 disable. One behaviour change: glob patterns in the input are no longer expanded by the shell, so they reach the scanner as literal paths.
 
