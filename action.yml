@@ -4,9 +4,12 @@ description: Real-time secret-leak guardrails for AI coding agents (Claude Code,
 branding:
   icon: shield
   color: blue
+
 inputs:
   paths:
-    description: Whitespace-separated paths to scan. Because paths are split on whitespace, an individual path cannot contain spaces; the default (.) scans the whole repository.
+    description: Whitespace-separated paths to scan. Because paths are split on
+      whitespace, an individual path cannot contain spaces; the default (.) scans
+      the whole repository.
     required: false
     default: "."
   gitleaks-version:
@@ -18,13 +21,16 @@ inputs:
     required: false
     default: ""
   require-checksum:
-    description: When true, fail if gitleaks-checksum is empty. Defaults to true so CI cannot silently fall back to HTTPS-only integrity. Set to false only for local experimentation.
+    description: When true, fail if gitleaks-checksum is empty. Defaults to true so CI
+      cannot silently fall back to HTTPS-only integrity. Set to false only for local
+      experimentation.
     required: false
     default: "true"
   config-path:
     description: Optional gitleaks config path. Defaults to the bundled Agent Guard config.
     required: false
     default: ""
+
 runs:
   using: composite
   steps:
@@ -51,6 +57,7 @@ runs:
         set -euo pipefail
         command -v jq >/dev/null || { echo "jq is required" >&2; exit 2; }
         command -v git >/dev/null || { echo "git is required" >&2; exit 2; }
+
     - name: Install gitleaks if missing
       shell: bash
       env:
@@ -98,7 +105,9 @@ runs:
         mkdir -p "$RUNNER_TEMP/agent-guard-bin"
         mv "$tmp/gitleaks" "$RUNNER_TEMP/agent-guard-bin/gitleaks"
         chmod +x "$RUNNER_TEMP/agent-guard-bin/gitleaks"
-        echo "$RUNNER_TEMP/agent-guard-bin" >> "$GITHUB_PATH"
+        safe_bin_dir=$(printf '%s' "$RUNNER_TEMP/agent-guard-bin" | tr -d '\n\r')
+        echo "$safe_bin_dir" >> "$GITHUB_PATH"
+
     - name: Run Agent Guard
       shell: bash
       env:
@@ -109,11 +118,9 @@ runs:
         if [ -z "${AGENT_GUARD_GITLEAKS_CONFIG:-}" ]; then
           unset AGENT_GUARD_GITLEAKS_CONFIG
         fi
-        # Safely tokenize whitespace-separated paths using xargs to avoid
-        # shell metacharacter injection from the paths input.
+        # Whitespace split (incl. newlines) without glob expansion.
         paths=()
         if [ -n "$AGENT_GUARD_PATHS" ]; then
-          while IFS= read -r -d '' t; do paths+=("$t"); done \
-            < <(printf '%s' "$AGENT_GUARD_PATHS" | xargs -r printf '%s\0')
+          read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true
         fi
-        "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- "${paths[@]}"
+        "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- ${paths[@]+"${paths[@]}"}

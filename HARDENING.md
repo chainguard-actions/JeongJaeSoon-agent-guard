@@ -10,26 +10,48 @@
 
 **Harden Agent Version:** `2`
 
-Action **JeongJaeSoon--agent-guard/v3.6.2** was hardened automatically. 1 finding(s) were identified and resolved across 1 iteration(s).
+Action **JeongJaeSoon--agent-guard/v3.6.2** was hardened automatically. 2 finding(s) were identified and resolved across 2 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Rule (b) violation: In the 'Run Agent Guard' step, `inputs.paths` is assigned to the `AGENT_GUARD_PATHS` env var via `AGENT_GUARD_PATHS: ${{ inputs.paths }}`, then expanded **unquoted** in the shell command: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`. An attacker who controls the `paths` input can inject shell metacharacters (`;`, `|`, `&`, `$(...)`, etc.) to execute arbitrary commands. The comment acknowledges the unquoting is intentional for word-splitting, but this does not mitigate the injection risk. The fix is to use an array or a safer splitting mechanism that does not expose the shell to metacharacter injection.
+Rule (b), unquoted shell variable expansion. In the 'Run Agent Guard' step, AGENT_GUARD_PATHS comes from the workflow-controlled inputs.paths and is expanded without quotes: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`. The word splitting is intentional (there is a shellcheck disable), but the unquoted expansion also lets the shell expand glob characters in the value. Fix: split into an array, e.g. `read -r -a paths <<< "$AGENT_GUARD_PATHS"`, and pass it as "${paths[@]}". Glob expansion can be turned off with set -f first.
 
 Locations:
 
-- `action.yml:89`
-- `action.yml:97`
+- `action.yml:106`
+
+### github-env-injection (severity: high)
+
+In the 'Install gitleaks if missing' step (composite action), `echo "$RUNNER_TEMP/agent-guard-bin" >> "$GITHUB_PATH"` writes a value built from an inherited process env var (RUNNER_TEMP). That var is not set in the same run: script, and the line has no `printf '%s' ... | tr -d '\n\r'` sanitization before the write. Fix: `safe=$(printf '%s' "$RUNNER_TEMP/agent-guard-bin" | tr -d '\n\r'); echo "$safe" >> "$GITHUB_PATH"`.
+
+Locations:
+
+- `action.yml:92`
 
 ## Iteration Notes
 
 ### Iteration 1
 
+**Fixes applied:** script-injection, github-env-injection
+
+**Notes:**
+
+I fixed both findings in action.yml. I haven't run or tested the action after the change.
+
+**script-injection:** The paths input is no longer expanded unquoted. It is now split into a bash array with `read -r -d '' -a ... || true`, so it still splits on spaces and newlines like before. One thing works differently: wildcards in a path are no longer expanded by the shell, so they reach the tool as literal text. That was the point of the finding.
+- The `|| true` is needed because `read -d ''` returns 1 at the end of input, which would otherwise fail the step under `set -e`.
+- The split only runs when the input isn't empty.
+- The array is passed as `${paths[@]+"${paths[@]}"}` so an empty list doesn't trip `set -u` on bash 3.2 (the version on macOS runners).
+
+**github-env-injection:** Newlines are now stripped from the gitleaks directory path (`printf '%s' | tr -d '\n\r'`) before it is written to $GITHUB_PATH.
+
+### Iteration 2
+
 **Fixes applied:** script-injection
 
 **Notes:**
 
-Fixed the script-injection vulnerability in the 'Run Agent Guard' step of action.yml. The unsafe unquoted `$AGENT_GUARD_PATHS` expansion (which allowed shell metacharacter injection via the `paths` input) was replaced with a safe xargs-based array tokenization pattern. The new code uses `printf '%s' "$AGENT_GUARD_PATHS" | xargs -r printf '%s\0'` piped through a NUL-delimited read loop to populate a bash array, then expands it as `"${paths[@]}"`. This preserves the intended whitespace-splitting behavior while preventing `;`, `|`, `&`, `$(...)`, and other metacharacters from being interpreted by the shell.
+Removed the leftover old command text (`lugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`) at the end of the Run Agent Guard step. This text left a quote open and expanded inputs.paths without quoting. The final line now reads `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- ${paths[@]+"${paths[@]}"}`. The whitespace split that uses read -d '' is unchanged. Also cleaned up a duplicated comment marker.
 
