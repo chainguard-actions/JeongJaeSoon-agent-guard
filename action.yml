@@ -117,11 +117,9 @@ runs:
         if [ -z "${AGENT_GUARD_GITLEAKS_CONFIG:-}" ]; then
           unset AGENT_GUARD_GITLEAKS_CONFIG
         fi
-        # Safely tokenize whitespace-separated paths using xargs to prevent
-        # shell metacharacter injection while preserving word-splitting behaviour.
+        # Split paths from env, not from unquoted YAML-time input expansion.
         paths=()
         if [ -n "$AGENT_GUARD_PATHS" ]; then
-          while IFS= read -r -d '' t; do paths+=("$t"); done \
-            < <(printf '%s' "$AGENT_GUARD_PATHS" | xargs -r printf '%s\0')
+          read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true
         fi
-        "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- "${paths[@]}"
+        "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- ${paths[@]+"${paths[@]}"}

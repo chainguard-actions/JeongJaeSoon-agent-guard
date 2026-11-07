@@ -10,25 +10,33 @@
 
 **Harden Agent Version:** `2`
 
-Action **JeongJaeSoon--agent-guard/v3.6.4** was hardened automatically. 1 finding(s) were identified and resolved across 1 iteration(s).
+Action **JeongJaeSoon--agent-guard/v3.6.4** was hardened automatically. 2 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Sub-rule (b) violation in the 'Run Agent Guard' step of action.yml: the env var AGENT_GUARD_PATHS is sourced from inputs.paths (attacker-controlled) and is expanded unquoted in the shell command: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`. The intentional word-splitting (noted by `# shellcheck disable=SC2086`) also allows shell metacharacter injection (`;`, `|`, `&`, `$(...)`, backticks, glob chars) from the inputs.paths value. The variable must be double-quoted or the input must be sanitized before use.
+Sub-rule (b), unquoted expansion of untrusted data. In the 'Run Agent Guard' step, AGENT_GUARD_PATHS comes from ${{ inputs.paths }} and is expanded without quotes: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`. The '--' stops the value being read as options. However, the value is still split on whitespace and glob characters in it are expanded, and the rule requires the expansion to be double-quoted. A safe fix is to split explicitly, for example `read -ra paths <<< "$AGENT_GUARD_PATHS"` followed by `"${paths[@]}"`, with globbing turned off (set -f).
 
 Locations:
 
-- `action.yml:100`
+- `action.yml:105`
+
+### github-env-injection (severity: high)
+
+In the 'Install gitleaks if missing' step, an inherited process env var is written to $GITHUB_PATH without sanitization: `echo "$RUNNER_TEMP/agent-guard-bin" >> "$GITHUB_PATH"`. The script reads RUNNER_TEMP but never sets it. In a composite action, the check treats any such inherited value as controlled by the calling workflow. The required `printf '%s' ... | tr -d '\n\r'` step is not applied before the write. Fix: `safe=$(printf '%s' "$RUNNER_TEMP/agent-guard-bin" | tr -d '\n\r'); echo "$safe" >> "$GITHUB_PATH"`.
+
+Locations:
+
+- `action.yml:91`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection
+**Fixes applied:** script-injection, github-env-injection
 
 **Notes:**
 
-Fixed script injection in the 'Run Agent Guard' step of action.yml (line 100). The unquoted `$AGENT_GUARD_PATHS` expansion (with `# shellcheck disable=SC2086`) allowed shell metacharacter injection from the attacker-controlled `inputs.paths` value. Replaced with a safe xargs-based tokenization pattern: the whitespace-separated paths are tokenized into a bash array using `printf '%s' "$AGENT_GUARD_PATHS" | xargs -r printf '%s\0'` with a null-delimited read loop, then the array is expanded as `"${paths[@]}"`. This preserves the intended word-splitting behavior for legitimate whitespace-separated paths while preventing injection of `;`, `|`, `&`, `$(...)`, backticks, and glob characters. An `if [ -n "$AGENT_GUARD_PATHS" ]` guard prevents xargs from emitting an empty token on empty input.
+script-injection: the step no longer expands $AGENT_GUARD_PATHS unquoted. It now reads the value into an array with `read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true`, which splits on any whitespace, newlines included, the same way upstream's unquoted expansion did. The read only runs when the value is non-empty. The array is passed after '--' as ${paths[@]+"${paths[@]}"}, so an empty array works under set -u even with bash 3.2 on macOS. Unlike upstream, glob characters in paths are no longer expanded. I used `read -d ''` rather than the `read -ra` the finding suggested, because `read -ra` reads only the first line and would drop paths given one per line. github-env-injection: the step now strips CR/LF from "$RUNNER_TEMP/agent-guard-bin" with printf | tr -d '\n\r' before writing it to $GITHUB_PATH.
 
