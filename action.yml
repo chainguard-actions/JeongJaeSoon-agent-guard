@@ -117,10 +117,7 @@ runs:
         if [ -z "${AGENT_GUARD_GITLEAKS_CONFIG:-}" ]; then
           unset AGENT_GUARD_GITLEAKS_CONFIG
         fi
-        # Split paths from env on whitespace (incl. newlines) into an array,
-        # without glob expansion or evaluation.
-        paths=()
-        if [ -n "$AGENT_GUARD_PATHS" ]; then
-          read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true
-        fi
+        # Split paths from env, not from unquoted YAML-time input expansion.
+        # shellcheck disable=SC2086
+        paths=($AGENT_GUARD_PATHS)   # same whitespace split and glob as upstream's unquoted expansion
         "${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- ${paths[@]+"${paths[@]}"}

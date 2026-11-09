@@ -16,11 +16,11 @@ Action **JeongJaeSoon--agent-guard/v3.6.3** was hardened automatically. 1 findin
 
 ### script-injection (severity: high)
 
-Sub-rule (b) is violated: an env var holding workflow-controlled data is expanded without double quotes. The 'Run Agent Guard' step sets AGENT_GUARD_PATHS from ${{ inputs.paths }} and runs: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS` (shellcheck SC2086 is turned off). Because the expansion is unquoted, the shell splits the value on whitespace and expands glob characters from attacker-supplied input. Fix: split the value into an array safely (e.g. `read -ra paths <<< "$AGENT_GUARD_PATHS"` with globbing disabled via `set -f`) and pass "${paths[@]}".
+Rule (b) violation in the 'Run Agent Guard' step. The env var AGENT_GUARD_PATHS comes from inputs.paths and is expanded unquoted as a command argument: `"${GITHUB_ACTION_PATH}/plugins/agent-guard/bin/agent-guard" scan-path -- $AGENT_GUARD_PATHS`. The shellcheck SC2086 exemption covers only an unquoted expansion inside an array assignment (NAME=($VAR)), not a bare command argument. To keep the whitespace-split behaviour, put the value in an array first (`# shellcheck disable=SC2086` followed by `paths=($AGENT_GUARD_PATHS)`), then pass "${paths[@]}".
 
 Locations:
 
-- `action.yml:105`
+- `action.yml:108`
 
 ## Iteration Notes
 
@@ -30,5 +30,5 @@ Locations:
 
 **Notes:**
 
-In action.yml, the 'Run Agent Guard' step no longer expands $AGENT_GUARD_PATHS unquoted. It now splits the value into an array with `read -r -d '' -a paths <<< "$AGENT_GUARD_PATHS" || true`, guarded by a non-empty check. This splits on whitespace and newlines the same way upstream did, and does no globbing or evaluation. The array is passed as ${paths[@]+"${paths[@]}"} so an empty value under set -u on bash 3.2 (macOS) doesn't fail. I also removed the shellcheck SC2086 disable. One behaviour change: glob patterns in the input are no longer expanded by the shell, so they reach the scanner as literal paths.
+In the 'Run Agent Guard' step, the paths are now loaded with `paths=($AGENT_GUARD_PATHS)` under a SC2086 disable comment. This splits on whitespace and expands globs the same way upstream did. The array is then passed as ${paths[@]+"${paths[@]}"}, so an empty value does not fail under set -u on bash 3.2 (macOS).
 
