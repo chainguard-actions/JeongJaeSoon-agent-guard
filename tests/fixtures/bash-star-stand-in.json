@@ -1,0 +1,296 @@
+[
+  {
+    "id": "python-lazy-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a lazy .*? regex names no letter of a protected extension",
+    "command": "python3 -c \"import re; print(re.sub(r'<!-- a -->(.*?)<!-- b -->', '', s))\""
+  },
+  {
+    "id": "pnpm-scope-glob",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a package-scope glob is not a protected path",
+    "command": "pnpm --filter '@werft-ai/*' build"
+  },
+  {
+    "id": "grep-include-star",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a bare include star is not a protected path",
+    "command": "grep -r --include='*' foo ."
+  },
+  {
+    "id": "star-then-star-stand-in",
+    "expected_status": 0,
+    "classification": "accepted-trade-off",
+    "description": "a word that pins no letter stays allowed, as cat key.* already is",
+    "command": "cat key.*?"
+  },
+  {
+    "id": "plain-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected extension operand is blocked",
+    "command": "cat key.p8"
+  },
+  {
+    "id": "relative-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dot-slash protected operand is blocked",
+    "command": "cat ./AuthKey_ABC.p8"
+  },
+  {
+    "id": "copy-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "copying a protected file is blocked",
+    "command": "cp secrets/x.p8 /tmp/"
+  },
+  {
+    "id": "star-extension-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a star glob over a protected extension is blocked",
+    "command": "cat *.p8"
+  },
+  {
+    "id": "quoted-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a quoted protected-extension glob is blocked",
+    "command": "cat '*.p8'"
+  },
+  {
+    "id": "dot-slash-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dot-slash protected-extension glob is blocked",
+    "command": "cat ./*.p8"
+  },
+  {
+    "id": "directory-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a directory protected-extension glob is blocked",
+    "command": "cat secrets/*.p8"
+  },
+  {
+    "id": "nested-shell-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected-extension glob run by a nested shell is blocked",
+    "command": "sh -c 'cat *.p8'"
+  },
+  {
+    "id": "find-name-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "find -name over a protected extension is blocked",
+    "command": "find . -name '*.p8' -exec cat {} +"
+  },
+  {
+    "id": "grep-include-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "grep --include over a protected extension is blocked",
+    "command": "grep -r --include='*.p8' BEGIN ."
+  },
+  {
+    "id": "question-mark-positions",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "one-character wildcards over a protected extension are blocked",
+    "command": "cat key.??"
+  },
+  {
+    "id": "bracket-positions",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "bracket classes over a protected extension are blocked",
+    "command": "cat key.[a-z][0-9]"
+  },
+  {
+    "id": "star-stand-in-pinned-last",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star with a pinned letter is blocked",
+    "command": "cat key.*8"
+  },
+  {
+    "id": "star-stand-in-pinned-middle",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star with a pinned middle letter is blocked",
+    "command": "cat .?n*"
+  },
+  {
+    "id": "star-stand-in-after-pinned-prefix",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star after a pinned dotfile prefix is blocked",
+    "command": "cat .e*?"
+  },
+  {
+    "id": "regex-with-pinned-letter",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "the regex of a sed s command is program text, not a file operand",
+    "command": "sed -E 's/x.*?y//' README.md"
+  },
+  {
+    "id": "sed-s-tab-bracket",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex with a bracket expression and a star names no file",
+    "command": "sed 's/^d2-gate\\t[^\\t]*\\t//' a.log"
+  },
+  {
+    "id": "sed-s-in-pipeline",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex in the middle of a pipeline names no file",
+    "command": "cut -c1-400 a.log | sed 's/^d2-gate\\t[^\\t]*\\t//' | head -107"
+  },
+  {
+    "id": "sed-s-extended-group",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an extended sed s regex with a group and a back-reference names no file",
+    "command": "sed -E 's/^([^\\t]*)\\t[^\\t]*\\t[^ ]+ /\\1 | /' a.log"
+  },
+  {
+    "id": "sed-s-expression-option",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s script given with -ne names no file",
+    "command": "sed -ne 's/^x\\t[^\\t]*//p' a.log"
+  },
+  {
+    "id": "sed-s-two-commands",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "two sed s commands joined by a semicolon name no file",
+    "command": "sed 's/^x\\t[^\\t]*//; s/[[:space:]]*$//g' a.log"
+  },
+  {
+    "id": "sed-s-file-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected file operand of sed stays blocked next to an s script",
+    "command": "sed 's/^[^\\t]*\\t//' env.local"
+  },
+  {
+    "id": "sed-s-script-file-option",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "with -f the s-shaped word is a file operand and stays blocked",
+    "command": "sed -f a.sed 's/.env/x/'"
+  },
+  {
+    "id": "sed-s-later-expression",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a later -e makes the earlier s-shaped word a file operand",
+    "command": "sed 's/.env/x/' -e p"
+  },
+  {
+    "id": "sed-read-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a sed r command names a file and stays blocked",
+    "command": "sed 'r env.local' a.log"
+  },
+  {
+    "id": "sed-s-write-flag",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an s command with a w flag names a file and stays blocked",
+    "command": "sed 's/.env/x/w env.local' a.log"
+  },
+  {
+    "id": "sed-s-execute-flag",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an s command with an e flag runs its result and stays blocked",
+    "command": "sed 's/.env/x/e' a.log"
+  },
+  {
+    "id": "sed-s-address",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a script with an address is not rewritten and is conservatively blocked",
+    "command": "sed '/.env/s/a/b/' a.log"
+  },
+  {
+    "id": "sed-s-bracket-delimiter",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a delimiter inside a bracket expression is not rewritten and is conservatively blocked",
+    "command": "sed 's/[/].env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-word-holding-sed",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an English word that holds the letters of sed does not name sed",
+    "command": "grep -E 'passed: [0-9]+' a.log | sed -E 's/^x\\t[^\\t]*//'"
+  },
+  {
+    "id": "sed-named-by-another-word",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a word that names sed outside its command start keeps the command unchanged",
+    "command": "alias sed=cat | sed 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-in-place",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "an in-place sed is not rewritten and is conservatively blocked",
+    "command": "sed -i 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-source",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "sed after a sourced script may be redefined and stays blocked",
+    "command": ". ./tools.sh; sed 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-inert-command",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex after an inert command is pattern text",
+    "command": "echo x; sed 's/^x\\t[^\\t]*//' a.log"
+  },
+  {
+    "id": "sed-s-after-grep-or",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex after || and grep is pattern text",
+    "command": "grep -q ok a.log || sed -E 's/^([^\\t]*)\\t[^\\t]*/\\1/' a.log"
+  },
+  {
+    "id": "sed-s-after-file-writing-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a command that can write files before sed stops the segment check",
+    "command": "cp a.log b.log; sed 's/^x\\t[^\\t]*//' b.log"
+  },
+  {
+    "id": "later-sed-file-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a later trusted sed still has its file operands checked",
+    "command": "echo x; sed 's/^x\\t[^\\t]*//' .terraformrc"
+  },
+  {
+    "id": "pattern-text-in-quoted-argument",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a protected pattern spelled in a quoted argument is conservatively blocked",
+    "command": "orch init demo --final-check \"deny list still has *.p8 entry\""
+  }
+]

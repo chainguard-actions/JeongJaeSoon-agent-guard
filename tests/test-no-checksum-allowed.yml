@@ -1,0 +1,32 @@
+name: Test require-checksum=false installs without checksum
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create clean scan targets
+        run: |
+          mkdir -p agent-guard-a agent-guard-b
+          printf 'alpha: 1\n' > agent-guard-a/a.yml
+          printf 'beta: two\n' > agent-guard-b/b.txt
+      - id: action
+        uses: .
+        with:
+          paths: agent-guard-a agent-guard-b
+          require-checksum: "false"
+      - name: Assert success and gitleaks on PATH
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks not on PATH"
+            exit 1
+          fi
+          echo "PASS"
