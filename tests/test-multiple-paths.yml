@@ -1,0 +1,30 @@
+name: Test multiple whitespace-separated paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create two clean directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/scan-a" "$RUNNER_TEMP/scan-b"
+          echo "alpha" > "$RUNNER_TEMP/scan-a/a.txt"
+          echo "beta" > "$RUNNER_TEMP/scan-b/b.txt"
+          echo "DIR_A=$RUNNER_TEMP/scan-a" >> "$GITHUB_ENV"
+          echo "DIR_B=$RUNNER_TEMP/scan-b" >> "$GITHUB_ENV"
+      - id: action
+        uses: .
+        with:
+          paths: ${{ env.DIR_A }} ${{ env.DIR_B }}
+          require-checksum: "false"
+      - name: Assert success
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          echo "PASS"
