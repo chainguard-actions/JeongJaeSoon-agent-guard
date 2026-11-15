@@ -1,0 +1,36 @@
+name: Test nonexistent config-path fails the scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create clean scan target
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ag-badcfg-scan"
+          printf 'harmless content\n' > "$GITHUB_WORKSPACE/ag-badcfg-scan/a.txt"
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          paths: ag-badcfg-scan
+          require-checksum: "false"
+          config-path: /nonexistent/agent-guard/gitleaks.toml
+      - name: Assert action failed closed
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected failure with a missing gitleaks config"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks install did not complete; failure not from missing config"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Cleanup
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/ag-badcfg-scan"

@@ -1,0 +1,50 @@
+name: Test clean path scan with pinned checksum
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Resolve gitleaks checksum from the official release
+        id: sum
+        run: |
+          set -euo pipefail
+          VERSION=8.30.1
+          case "$(uname -m)" in
+            x86_64|amd64) arch=x64 ;;
+            arm64|aarch64) arch=arm64 ;;
+          esac
+          tmp="$(mktemp -d)"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_checksums.txt" -o "$tmp/sums.txt"
+          sha="$(awk -v f="gitleaks_${VERSION}_linux_${arch}.tar.gz" '$2==f {print $1}' "$tmp/sums.txt")"
+          echo "sha: $sha"
+          [ -n "$sha" ] || { echo "FAIL: could not resolve checksum"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Create clean scan target
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ag-clean-scan"
+          printf 'ordinary application source\nhello world\n' > "$GITHUB_WORKSPACE/ag-clean-scan/app.txt"
+      - id: action
+        uses: .
+        with:
+          paths: ag-clean-scan
+          gitleaks-checksum: ${{ steps.sum.outputs.sha }}
+      - name: Assert action succeeded and gitleaks is available
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if ! command -v gitleaks >/dev/null; then
+            echo "FAIL: gitleaks not on PATH after action"
+            exit 1
+          fi
+          gitleaks version
+          echo "PASS"
+      - name: Cleanup
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/ag-clean-scan"
