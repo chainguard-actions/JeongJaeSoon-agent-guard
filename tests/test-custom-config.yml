@@ -1,0 +1,43 @@
+name: Test custom gitleaks config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create clean scan target
+        run: |
+          mkdir -p scan-custom
+          echo "plain content" > scan-custom/a.txt
+      - id: clean
+        uses: .
+        with:
+          paths: scan-custom
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml
+      - name: Add content matching the custom rule
+        run: |
+          echo "value=AGTEST_ABCDEFGHIJ0123456789" > scan-custom/b.txt
+      - id: dirty
+        uses: .
+        continue-on-error: true
+        with:
+          paths: scan-custom
+          require-checksum: "false"
+          config-path: ${{ github.workspace }}/tests/fixtures/custom-gitleaks.toml
+      - name: Assert custom config accepted and custom rule enforced
+        env:
+          CLEAN: ${{ steps.clean.outcome }}
+          DIRTY: ${{ steps.dirty.outcome }}
+        run: |
+          echo "clean: $CLEAN dirty: $DIRTY"
+          if [ "$CLEAN" != "success" ]; then
+            echo "FAIL: clean scan with custom config should succeed"
+            exit 1
+          fi
+          if [ "$DIRTY" != "failure" ]; then
+            echo "FAIL: custom rule match should fail the scan"
+            exit 1
+          fi
+          echo "PASS"
