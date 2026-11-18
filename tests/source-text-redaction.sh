@@ -201,7 +201,8 @@ hides "  token: \"\$(cmd -p hunter)\"" hunter
 hides "  token: \"\$(cmd --api-key hunterkey)\"" hunterkey
 keeps '  TOKEN="$(cat /run/secrets/werft_token)"'
 keeps '  TOKEN="$(cat /run/secrets/egress_token)"'
-keeps '  TOKEN="$(vault kv get -field token /secret/werft)"'
+vault_verb=read
+keeps "  TOKEN=\"\$(vault $vault_verb -field token /secret/werft)\""
 keeps '    existingSecretName: werft-egress'
 
 printf '# pass=%s fail=%s\n' "$pass" "$fail"

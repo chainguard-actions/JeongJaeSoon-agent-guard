@@ -266,7 +266,7 @@ JSON
   # does a variable that may split or join other words.
   for shell_cmd in \
     "$(printf 'cat <<%s | bash\n$(echo git) push\nEOF' "'EOF'")" \
-    "$(printf 'cat \076 \076(bash) <<%s\n$(echo git) push\nEOF' "'EOF'")" \
+    "$(printf 'cat > %s(bash) <<%s\n$(echo git) push\nEOF' '>' "'EOF'")" \
     "$(printf 'cat <<%s \\\n| bash\n$(echo git) push\nEOF' "'EOF'")" \
     "$(printf 'bash <<%s\n`echo git` push\nEOF' "'EOF'")" \
     "R='/tmp/x push'; git -C \$R" \
