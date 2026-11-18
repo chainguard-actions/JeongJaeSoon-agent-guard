@@ -89,7 +89,7 @@ allow jq -r '.a.key, .b.p8, .c.env' s.json
 allow command jq -r '.tls.key' s.json
 read cat .env
 read grep -E '^VALUE=' .env
-read cut -c7- state.env
+read cut '-d=' -f2 state.env
 read grep -e VALUE .env
 read grep -E '\.env|VALUE' .env.local
 read grep -r --include='*.env' VALUE .
