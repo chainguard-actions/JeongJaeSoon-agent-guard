@@ -105,7 +105,8 @@ runs:
         mkdir -p "$RUNNER_TEMP/agent-guard-bin"
         mv "$tmp/gitleaks" "$RUNNER_TEMP/agent-guard-bin/gitleaks"
         chmod +x "$RUNNER_TEMP/agent-guard-bin/gitleaks"
-        echo "$RUNNER_TEMP/agent-guard-bin" >> "$GITHUB_PATH"
+        safe_bin_dir=$(printf '%s' "$RUNNER_TEMP/agent-guard-bin" | tr -d '\n\r')
+        echo "$safe_bin_dir" >> "$GITHUB_PATH"
 
     - name: Run Agent Guard
       shell: bash

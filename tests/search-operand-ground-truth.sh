@@ -2,7 +2,7 @@
 # Ground truth for the Bash path match leaving out grep/rg search patterns and
 # new openssl output paths: each command is judged by the hook, then run in a
 # sandbox whose protected files hold a canary. An allowed command must not
-# print the canary; a `leak` command must both be blocked and print it when
+# print the canary; a `read` command must both be blocked and print it when
 # run, which proves the harness can see a leak.
 set -u
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
@@ -50,7 +50,7 @@ while read -r kind cmd; do
       (cd "$W" && sh -c "$cmd") </dev/null >"$CASE/out" 2>&1
       if grep -Fq "$canary" "$CASE/out"; then bad "allowed command printed protected content: $cmd"; else ok "no protected content: $cmd"; fi
       ;;
-    leak)
+    reads)
       if [ "$status" -eq 2 ] && grep -Fq 'reason=bash_protected_path_text_match' "$CASE/err"; then
         ok "blocked read: $cmd"
       else
@@ -87,23 +87,23 @@ allow ls -a . && sed -n 's/.env/x/p' list.txt
 allow echo x; jq -n '{a: 1} | .tls.key'
 allow jq -r '.a.key, .b.p8, .c.env' s.json
 allow command jq -r '.tls.key' s.json
-leak cat .env
-leak grep -E '^VALUE=' .env
-leak cut -d= -f2 state.env
-leak grep -e VALUE .env
-leak grep -E '\.env|VALUE' .env.local
-leak grep -r --include='*.env' VALUE .
-leak grep VALUE .env*
-leak grep -h VALUE list.txt .env
-leak cat .env | grep -E '\.env|VALUE'
-leak grep -f list.txt .env
-leak grep VALUE < .env
-leak sed 's/^x\t[^\t]*//' .env
-leak sed 's/.env/x/' list.txt .env
-leak echo x; sed 's/^x\t[^\t]*//' .env
-leak echo x; jq -R . tls.key
-leak jq -R '. // .tls.key' tls.key
-leak command jq -R . tls.key
+reads cat .env
+reads grep -E '^VALUE=' .env
+reads cut -d= -f2 state.env
+reads grep -e VALUE .env
+reads grep -E '\.env|VALUE' .env.local
+reads grep -r --include='*.env' VALUE .
+reads grep VALUE .env*
+reads grep -h VALUE list.txt .env
+reads cat .env | grep -E '\.env|VALUE'
+reads grep -f list.txt .env
+reads grep VALUE < .env
+reads sed 's/^x\t[^\t]*//' .env
+reads sed 's/.env/x/' list.txt .env
+reads echo x; sed 's/^x\t[^\t]*//' .env
+reads echo x; jq -R . tls.key
+reads jq -R '. // .tls.key' tls.key
+reads command jq -R . tls.key
 held grep -f .env list.txt
 held grep --file=.env list.txt
 held grep pat list.txt -e .env
