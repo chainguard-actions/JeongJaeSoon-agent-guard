@@ -1,0 +1,83 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Read|NotebookRead|Grep|Glob|Bash|WebFetch|WebSearch|apply_patch|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-pre-tool \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 60,
+            "statusMessage": "agent-guard: checking tool call",
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|apply_patch|Read|NotebookRead|Grep|Glob|WebFetch|WebSearch|Agent|Task|Skill|Monitor|LSP|ListMcpResourcesTool|ReadMcpResourceTool|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-post-tool \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning tool output"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "^(Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|apply_patch|Read|NotebookRead|Grep|Glob|WebFetch|WebSearch|Agent|Task|Skill|Monitor|LSP|ListMcpResourcesTool|ReadMcpResourceTool|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-post-tool-failure \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning failed tool output"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-stop \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning changes"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-session-start \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 5,
+            "statusMessage": "agent-guard: checking setup"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${CLAUDE_PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" claude hook-user-prompt \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: CLAUDE_PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 10,
+            "statusMessage": "agent-guard: scanning prompt"
+          }
+        ]
+      }
+    ]
+  }
+}

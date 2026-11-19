@@ -1,6 +1,11 @@
 {
   "owner": "JeongJaeSoon",
   "repo": "agent-guard",
-  "version": "",
-  "url": "https://github.com/JeongJaeSoon/agent-guard"
+  "version": "v3.12.0",
+  "commit_sha": "43f8ed7e61fe452b21ee8be0e1f85025c1596e87",
+  "url": "https://github.com/JeongJaeSoon/agent-guard",
+  "policy_sha": "374911c4be584df24e6da57af2d990570ef0f859",
+  "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
+  "test_agent_version": "2",
+  "harden_agent_version": "2"
 }

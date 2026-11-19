@@ -1,0 +1,709 @@
+[
+  {
+    "id": "python-lazy-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a lazy .*? regex names no letter of a protected extension",
+    "command": "python3 -c \"import re; print(re.sub(r'<!-- a -->(.*?)<!-- b -->', '', s))\""
+  },
+  {
+    "id": "pnpm-scope-glob",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a package-scope glob is not a protected path",
+    "command": "pnpm --filter '@werft-ai/*' build"
+  },
+  {
+    "id": "grep-include-star",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a bare include star is not a protected path",
+    "command": "grep -r --include='*' foo ."
+  },
+  {
+    "id": "star-then-star-stand-in",
+    "expected_status": 0,
+    "classification": "accepted-trade-off",
+    "description": "a word that pins no letter stays allowed, as cat key.* already is",
+    "command": "cat key.*?"
+  },
+  {
+    "id": "plain-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected extension operand is blocked",
+    "command": "cat key.p8"
+  },
+  {
+    "id": "relative-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dot-slash protected operand is blocked",
+    "command": "cat ./AuthKey_ABC.p8"
+  },
+  {
+    "id": "copy-protected-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "copying a protected file is blocked",
+    "command": "cp secrets/x.p8 /tmp/"
+  },
+  {
+    "id": "star-extension-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a star glob over a protected extension is blocked",
+    "command": "cat *.p8"
+  },
+  {
+    "id": "quoted-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a quoted protected-extension glob is blocked",
+    "command": "cat '*.p8'"
+  },
+  {
+    "id": "dot-slash-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dot-slash protected-extension glob is blocked",
+    "command": "cat ./*.p8"
+  },
+  {
+    "id": "directory-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a directory protected-extension glob is blocked",
+    "command": "cat secrets/*.p8"
+  },
+  {
+    "id": "nested-shell-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected-extension glob run by a nested shell is blocked",
+    "command": "sh -c 'cat *.p8'"
+  },
+  {
+    "id": "find-name-star-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "find -name over a protected extension is blocked",
+    "command": "find . -name '*.p8' -exec cat {} +"
+  },
+  {
+    "id": "grep-include-extension",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "grep --include over a protected extension is blocked",
+    "command": "grep -r --include='*.p8' BEGIN ."
+  },
+  {
+    "id": "question-mark-positions",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "one-character wildcards over a protected extension are blocked",
+    "command": "cat key.??"
+  },
+  {
+    "id": "bracket-positions",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "bracket classes over a protected extension are blocked",
+    "command": "cat key.[a-z][0-9]"
+  },
+  {
+    "id": "star-stand-in-pinned-last",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star with a pinned letter is blocked",
+    "command": "cat key.*8"
+  },
+  {
+    "id": "star-stand-in-pinned-middle",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star with a pinned middle letter is blocked",
+    "command": "cat .?n*"
+  },
+  {
+    "id": "star-stand-in-after-pinned-prefix",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a one-character star after a pinned dotfile prefix is blocked",
+    "command": "cat .e*?"
+  },
+  {
+    "id": "regex-with-pinned-letter",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "the regex of a sed s command is program text, not a file operand",
+    "command": "sed -E 's/x.*?y//' README.md"
+  },
+  {
+    "id": "sed-s-tab-bracket",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex with a bracket expression and a star names no file",
+    "command": "sed 's/^d2-gate\\t[^\\t]*\\t//' a.log"
+  },
+  {
+    "id": "sed-s-in-pipeline",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex in the middle of a pipeline names no file",
+    "command": "cut -c1-400 a.log | sed 's/^d2-gate\\t[^\\t]*\\t//' | head -107"
+  },
+  {
+    "id": "sed-s-extended-group",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an extended sed s regex with a group and a back-reference names no file",
+    "command": "sed -E 's/^([^\\t]*)\\t[^\\t]*\\t[^ ]+ /\\1 | /' a.log"
+  },
+  {
+    "id": "sed-s-expression-option",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s script given with -ne names no file",
+    "command": "sed -ne 's/^x\\t[^\\t]*//p' a.log"
+  },
+  {
+    "id": "sed-s-two-commands",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "two sed s commands joined by a semicolon name no file",
+    "command": "sed 's/^x\\t[^\\t]*//; s/[[:space:]]*$//g' a.log"
+  },
+  {
+    "id": "sed-s-file-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a protected file operand of sed stays blocked next to an s script",
+    "command": "sed 's/^[^\\t]*\\t//' env.local"
+  },
+  {
+    "id": "sed-s-script-file-option",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "with -f the s-shaped word is a file operand and stays blocked",
+    "command": "sed -f a.sed 's/.env/x/'"
+  },
+  {
+    "id": "sed-s-later-expression",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a later -e makes the earlier s-shaped word a file operand",
+    "command": "sed 's/.env/x/' -e p"
+  },
+  {
+    "id": "sed-read-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a sed r command names a file and stays blocked",
+    "command": "sed 'r env.local' a.log"
+  },
+  {
+    "id": "sed-s-write-flag",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an s command with a w flag names a file and stays blocked",
+    "command": "sed 's/.env/x/w env.local' a.log"
+  },
+  {
+    "id": "sed-s-execute-flag",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an s command with an e flag runs its result and stays blocked",
+    "command": "sed 's/.env/x/e' a.log"
+  },
+  {
+    "id": "sed-s-address",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "the regex of an address before an s command is program text too (#494)",
+    "command": "sed '/.env/s/a/b/' a.log"
+  },
+  {
+    "id": "sed-s-bracket-delimiter",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a delimiter inside a bracket expression is not rewritten and is conservatively blocked",
+    "command": "sed 's/[/].env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-word-holding-sed",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an English word that holds the letters of sed does not name sed",
+    "command": "grep -E 'passed: [0-9]+' a.log | sed -E 's/^x\\t[^\\t]*//'"
+  },
+  {
+    "id": "sed-named-by-another-word",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a word that names sed outside its command start keeps the command unchanged",
+    "command": "alias sed=cat | sed 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-in-place",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "an in-place sed is not rewritten and is conservatively blocked",
+    "command": "sed -i 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-source",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "sed after a sourced script may be redefined and stays blocked",
+    "command": ". ./tools.sh; sed 's/.env/x/' a.log"
+  },
+  {
+    "id": "sed-s-after-inert-command",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex after an inert command is pattern text",
+    "command": "echo x; sed 's/^x\\t[^\\t]*//' a.log"
+  },
+  {
+    "id": "sed-s-after-grep-or",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a sed s regex after || and grep is pattern text",
+    "command": "grep -q ok a.log || sed -E 's/^([^\\t]*)\\t[^\\t]*/\\1/' a.log"
+  },
+  {
+    "id": "sed-s-after-file-writing-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a command that can write files before sed stops the segment check",
+    "command": "cp a.log b.log; sed 's/^x\\t[^\\t]*//' b.log"
+  },
+  {
+    "id": "later-sed-file-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a later trusted sed still has its file operands checked",
+    "command": "echo x; sed 's/^x\\t[^\\t]*//' .terraformrc"
+  },
+  {
+    "id": "python-program-bracket-star-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a bracket-star regex in a python -c program is not a shell glob",
+    "command": "python3 -c 'import re; print(re.findall(r\"id[a-z_]*\", \"x\"))'"
+  },
+  {
+    "id": "python-program-star-string",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a prefix-star string in a python -c program is not a shell glob",
+    "command": "python3 -c 'print(\"id_*\")'"
+  },
+  {
+    "id": "node-program-bracket-star-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a bracket-star regex in a node -e program is not a shell glob",
+    "command": "node -e 'console.log(\"x\".match(/id[_a-z]*/))'"
+  },
+  {
+    "id": "jq-filter-bracket-star-string",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a bracket-star regex in a piped jq filter string is not a shell glob",
+    "command": "printf x | jq -R 'select(test(\"id[_a-z]*\"))'"
+  },
+  {
+    "id": "awk-program-bracket-star-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "awk regexes with a bracket-star or a question mark are not shell globs",
+    "command": "awk -F: '/id_r?a/ || /id[_a-z]*/ {print $1}' log.txt"
+  },
+  {
+    "id": "bracket-star-glob-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an unquoted bracket-star glob that expands to a key file is blocked",
+    "command": "cat ~/.ssh/id[_r]*"
+  },
+  {
+    "id": "bracket-star-glob-jq-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a bracket-star glob is blocked as a jq file operand",
+    "command": "jq . ~/.ssh/id[_r]*"
+  },
+  {
+    "id": "bracket-star-glob-awk-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a bracket-star glob is blocked as an awk file operand",
+    "command": "awk 1 id[_r]*"
+  },
+  {
+    "id": "bracket-star-glob-after-node-program",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an unquoted glob after a node -e program is still a shell glob",
+    "command": "node -e 'console.log(1)' id[_r]*"
+  },
+  {
+    "id": "jq-from-file-quoted-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a quoted word after jq -f is a file operand, not a filter",
+    "command": "jq -f 'id[_r]*' x.json"
+  },
+  {
+    "id": "awk-program-pipes-to-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an awk program that pipes to a command lets the shell expand the glob",
+    "command": "awk '{print | \"cat id[_r]*\"}' log.txt"
+  },
+  {
+    "id": "python-program-globs",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that globs reads the pattern as a glob",
+    "command": "python3 -c 'import glob; print(glob.glob(\"id[_r]*\"))'"
+  },
+  {
+    "id": "jq-filter-glob-output-to-text-filter",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a jq filter whose output only reaches text filters is not a shell glob",
+    "command": "printf x | jq -R 'select(test(\"id[_a-z]*\"))' | sort | head -5"
+  },
+  {
+    "id": "jq-select-field-regex-bracket-star",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a field access right after ( in a jq filter does not turn its regex text into a glob",
+    "command": "jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' data.json"
+  },
+  {
+    "id": "jq-select-nested-field-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a field chain after an iterator and ( keeps the regex text out of the glob scan",
+    "command": "jq -r '.files[] | select(.path | test(\"id[_a-z]*\")) | .path' data.json"
+  },
+  {
+    "id": "jq-select-field-regex-question",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a ? in regex text after a field access is not a glob",
+    "command": "jq -r '.items[] | select(.key | test(\"id_r?a\"))' data.json"
+  },
+  {
+    "id": "jq-select-field-regex-no-space",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a field access glued to the pipe inside select is filter text",
+    "command": "jq -r 'select(.name|test(\"id[_a-z]*\"))' data.json"
+  },
+  {
+    "id": "jq-select-field-regex-piped-in",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a jq filter reading piped JSON with a field access and regex text is not a glob",
+    "command": "gh api repos/o/r/contents | jq -r '.[] | select(.name | test(\"id[_a-z]*\")) | .path' | head -5"
+  },
+  {
+    "id": "jq-select-field-regex-glob-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a glob operand after a jq filter with a field access is still a glob",
+    "command": "jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' ~/.ssh/id[_r]*"
+  },
+  {
+    "id": "jq-select-field-plain-glob-operand",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a glob operand after a field-access jq filter without glob text is still a glob",
+    "command": "jq -r 'select(.name | test(\"x\"))' id[_r]*"
+  },
+  {
+    "id": "jq-select-field-regex-after-dot-command",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dot command before the jq may redefine it, so the filter's regex text stays a glob",
+    "command": ". ./env.sh; jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' data.json"
+  },
+  {
+    "id": "jq-select-field-regex-output-to-shell",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a field-access jq filter whose output a shell runs is still a glob",
+    "command": "jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' data.json | sh"
+  },
+  {
+    "id": "jq-select-field-regex-output-as-words",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a field-access jq filter whose output the shell expands is still a glob",
+    "command": "cat $(jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' data.json)"
+  },
+  {
+    "id": "jq-select-field-regex-then-glob-read",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a glob read chained after a field-access jq filter is still a glob",
+    "command": "jq -r '.[] | select(.name | test(\"id[_a-z]*\"))' data.json && cat ~/.ssh/id[_r]*"
+  },
+  {
+    "id": "jq-select-literal-dot-regex",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a dot that the filter itself spells after ( still reads as a dot command, so its regex text stays a glob",
+    "command": "jq -r '.[] | select(. | test(\"id[_a-z]*\"))' data.json"
+  },
+  {
+    "id": "python-program-output-to-scheduler",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a program whose output goes to a command that may run it through a shell is still a glob",
+    "command": "python3 -c 'print(\"cat id[_r]*\")' | at now"
+  },
+  {
+    "id": "python-program-in-group-on-piped-names",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program in a group fed through a pipe may open the names it reads",
+    "command": "ls | (python3 -c 'import io,sys,re; [print(io.FileIO(p.strip()).readall()) for p in sys.stdin if re.fullmatch(\"id[_a-z]*\",p.strip())]')"
+  },
+  {
+    "id": "node-program-on-stderr-pipe",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a node -e program fed through |& may open the names it reads",
+    "command": "ls |& node -e 'console.log(/id[_r]*/)'"
+  },
+  {
+    "id": "python-program-fileio-on-piped-names",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program fed names through a pipe may open them with any file API",
+    "command": "ls | python3 -c 'import io,sys,re; [print(io.FileIO(p.strip()).readall()) for p in sys.stdin if re.fullmatch(\"id[_a-z]*\",p.strip())]'"
+  },
+  {
+    "id": "python-program-fileio-on-names-from-file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens names read from a file with io.FileIO can match its pattern against them",
+    "command": "python3 -c 'import io,re; [print(io.FileIO(n).readall()) for n in io.FileIO(\"names.txt\").readall().decode().split() if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-imported-fileio",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens files through an imported FileIO alias can match its pattern against names",
+    "command": "python3 -c 'from io import FileIO as F; import re; [print(F(n).readall()) for n in F(\"names.txt\").readall().decode().split() if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-c-level-fileio",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens files through _io.FileIO can match its pattern against names",
+    "command": "python3 -c 'import _io,re; [print(_io.FileIO(n).readall()) for n in [\"a\"] if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-gzipfile-raw-read",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that reads a file raw through gzip.GzipFile can match its pattern against names",
+    "command": "python3 -c 'import gzip,re; [print(gzip.GzipFile(n).fileobj.read()) for n in gzip.GzipFile(\"names.gz\").read().decode().split() if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-bz2file",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens files through bz2.BZ2File can match its pattern against names",
+    "command": "python3 -c 'import bz2,re; [print(bz2.BZ2File(n).read()) for n in [\"a\"] if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-lzmafile",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens files through lzma.LZMAFile can match its pattern against names",
+    "command": "python3 -c 'import lzma,re; [print(lzma.LZMAFile(n).read()) for n in [\"a\"] if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "python-program-aliased-file-class",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that imports a file class under an alias can match its pattern against names",
+    "command": "python3 -c 'from gzip import GzipFile as G; import re; [print(G(n).fileobj.read()) for n in [\"a\"] if re.fullmatch(\"id[_a-z]*\",n)]'"
+  },
+  {
+    "id": "awk-program-argv-on-piped-names",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an awk program that adds piped names to ARGV reads those files",
+    "command": "ls | awk '/id[_r]*/ {ARGV[ARGC++]=$0}'"
+  },
+  {
+    "id": "node-program-lists-directory",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a node -e program that lists a directory can match its pattern against names",
+    "command": "node -e 'console.log(require(\"fs\").readdirSync(\".\").filter(f => /id[_r]*/.test(f)))'"
+  },
+  {
+    "id": "python-program-opens-piped-names",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python -c program that opens names piped to it can match its pattern against them",
+    "command": "ls | python3 -c 'import sys,re; [print(open(l.strip()).read()) for l in sys.stdin if re.match(\"id[_r]*\", l)]'"
+  },
+  {
+    "id": "node-program-output-as-shell-words",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a program whose output the shell expands is still a glob",
+    "command": "cat $(node -e 'console.log(\"id[_r]*\")')"
+  },
+  {
+    "id": "python-program-polars-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python program that imports polars may expand its pattern argument itself",
+    "command": "python3 -c 'import polars as pl; print(pl.read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-dask-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a dotted import such as dask.dataframe keeps the glob scan",
+    "command": "python3 -c 'import dask.dataframe as dd; print(dd.read_csv(\"d/id_[r]*\").compute())'"
+  },
+  {
+    "id": "python-program-duckdb-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python program that imports duckdb may expand its pattern argument itself",
+    "command": "python3 -c 'import duckdb; print(duckdb.read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-datasets-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a python program that imports datasets may expand its data_files pattern",
+    "command": "python3 -c 'import datasets; print(datasets.load_dataset(\"text\", data_files=\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-pyspark-from-import-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a from-import of an outside module keeps the glob scan",
+    "command": "python3 -c 'from pyspark.sql import SparkSession as S; print(S.builder.getOrCreate().read.text(\"d/id_[r]*\").collect())'"
+  },
+  {
+    "id": "python-program-from-import-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a from x import y of an outside module after an allowed one keeps the glob scan",
+    "command": "python3 -c 'from re import sub; from polars import read_csv; print(read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-outside-module-aliased-as-allowed",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an outside module imported under an allowed module's name keeps the glob scan",
+    "command": "python3 -c 'import polars as re; print(re.read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-outside-module-after-allowed",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an outside module listed after an allowed one in the same import keeps the glob scan",
+    "command": "python3 -c 'import re, polars; print(polars.read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-import-inside-compound-statement",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "an import that does not open a statement is not read and keeps the glob scan",
+    "command": "python3 -c 'if 1: import polars as pl; print(pl.read_csv(\"d/id_[r]*\"))'"
+  },
+  {
+    "id": "python-program-regex-pattern-to-reader",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a regex whose .re.pattern reaches an outside reader keeps the glob scan",
+    "command": "python3 -c 'import polars as pl, re; print(pl.read_csv(re.search(\"d/id_[r]*\", \"x\").re.pattern))'"
+  },
+  {
+    "id": "node-program-shelljs-reader-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a node program that requires a module may expand its pattern argument",
+    "command": "node -e 'console.log(require(\"shelljs\").cat(\"d/id_[r]*\").toString())'"
+  },
+  {
+    "id": "node-program-regex-source-to-reader",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a regex source handed to a required module keeps the glob scan",
+    "command": "node -e 'console.log(require(\"shelljs\").cat(/id_[r]*/.source).toString())'"
+  },
+  {
+    "id": "node-program-dynamic-import-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a node program that loads a module with import() keeps the glob scan",
+    "command": "node -e 'import(\"shelljs\").then(s => console.log(s.cat(\"d/id_[r]*\").toString()))'"
+  },
+  {
+    "id": "bun-program-require-glob",
+    "expected_status": 2,
+    "classification": "must-fail",
+    "description": "a bun program that requires a module keeps the glob scan",
+    "command": "bun -e 'console.log(require(\"shelljs\").cat(\"d/id_[r]*\").toString())'"
+  },
+  {
+    "id": "python-program-imports-re-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a python program that imports only re keeps its regex text out of the glob scan",
+    "command": "python3 -c 'import re; print(re.findall(r\"id[a-z_]*\", \"x\"))'"
+  },
+  {
+    "id": "python-program-imports-re-sys-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an import list of allowed modules, one aliased, keeps the exception",
+    "command": "python3 -c 'import re, sys as s; print(re.findall(r\"id[a-z_]*\", s.argv[0]))'"
+  },
+  {
+    "id": "python-program-from-collections-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a from-import of an allowed module keeps the exception",
+    "command": "python3 -c 'from collections import Counter; import re; print(Counter(re.findall(r\"id[a-z_]*\", \"x\")))'"
+  },
+  {
+    "id": "python-program-import-json-alias-star",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "an allowed module imported under an alias keeps the exception",
+    "command": "python3 -c 'import json as j; print(j.dumps(\"id_[r]*\"))'"
+  },
+  {
+    "id": "node-program-no-module-regex",
+    "expected_status": 0,
+    "classification": "must-pass",
+    "description": "a node program that loads no module keeps its regex text out of the glob scan",
+    "command": "node -e 'const r = /id[_a-z]*/; console.log(r.test(\"x\"))'"
+  },
+  {
+    "id": "pattern-text-in-quoted-argument",
+    "expected_status": 2,
+    "classification": "known-limitation",
+    "description": "a protected pattern spelled in a quoted argument is conservatively blocked",
+    "command": "orch init demo --final-check \"deny list still has *.p8 entry\""
+  }
+]
