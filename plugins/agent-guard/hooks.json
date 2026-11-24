@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" codex hook-pre-tool \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 60,
+            "statusMessage": "agent-guard: checking tool call"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" codex hook-post-tool \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning tool output"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" codex hook-stop \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning changes"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" codex hook-session-start \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 5,
+            "statusMessage": "agent-guard: checking setup"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'r=${PLUGIN_ROOT:-}; [ -n \"$r\" ] && for q in \"$r\" \"${r%/*}/current\" \"${r%/*}\"/[0-9]*.[0-9]*.[0-9]*; do [ -f \"$q/hooks/launch.sh\" ] && exec sh \"$q/hooks/launch.sh\" codex hook-user-prompt \"$r\"; done; while read -r l; do :; done; case ${AGENT_GUARD_INFRA_FAILURE_MODE:-open} in closed) m=closed a=blocking ;; *) m=open a=continuing ;; esac; echo \"agent-guard: PLUGIN_ROOT env not set or no hook launcher was found; $a because AGENT_GUARD_INFRA_FAILURE_MODE=$m\" >&2; [ \"$m\" = closed ] && exit 2; exit 0'",
+            "timeout": 10,
+            "statusMessage": "agent-guard: scanning prompt"
+          }
+        ]
+      }
+    ]
+  }
+}
