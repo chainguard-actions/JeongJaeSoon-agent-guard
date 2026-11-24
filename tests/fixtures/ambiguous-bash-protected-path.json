@@ -1,0 +1,462 @@
+[
+  {
+    "id": "public-port-member",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "inline Node public PORT access is a member read of the runtime object, not a file",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'console.log(process.env.PORT)'"}}
+  },
+  {
+    "id": "spawn-inherits-environment",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "known-limitation",
+    "description": "inline Node child environment inheritance is conservatively blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'const {spawn}=require(\"node:child_process\"); const srv=spawn(process.execPath,[\"server.mjs\"],{env:{...process.env,PORT:\"43119\"},stdio:\"ignore\"}); srv.kill()'"}}
+  },
+  {
+    "id": "ripgrep-environment-member-pattern",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "known-limitation",
+    "description": "ripgrep environment-member search is conservatively blocked: a ripgrep config file may make the pattern a path",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "rg -n 'process\\.env\\.PORT' src"}}
+  },
+  {
+    "id": "ripgrep-no-config-environment-member-pattern",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a ripgrep search pattern with --no-config is not a file operand",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "rg --no-config -n 'process\\.env\\.PORT' src"}}
+  },
+  {
+    "id": "env-wrapped-public-port-member",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "env-wrapped inline Node public PORT access is a member read of the runtime object, not a file",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "env NODE_ENV=test node -e 'console.log(process.env.PORT)'"}}
+  },
+  {
+    "id": "command-wrapped-public-port-member",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "command-wrapped inline Node public PORT access is a member read of the runtime object, not a file",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "command node -e 'console.log(process.env.PORT)'"}}
+  },
+  {
+    "id": "whole-environment-dump",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "security-invariant",
+    "description": "inline Node whole environment dump remains blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'console.log(process.env)'"}}
+  },
+  {
+    "id": "inline-protected-file-read",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "security-invariant",
+    "description": "inline Node protected environment-file read remains blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'require(\"node:fs\").readFileSync(\".env.local\",\"utf8\")'"}}
+  },
+  {
+    "id": "matching-real-file-operand",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "security-invariant",
+    "description": "a real file operand with the same environment-member spelling remains blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat process.env.PORT"}}
+  },
+  {
+    "id": "mixed-inline-source-and-protected-file",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "security-invariant",
+    "description": "a protected file read beside inline source remains blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'console.log(process.env.PORT)'; cat .env.local"}}
+  },
+  {
+    "id": "wrapped-mixed-inline-source-and-protected-file",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "security-invariant",
+    "description": "a wrapped protected file read beside inline source remains an unambiguous path block",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "env NODE_ENV=test node -e 'console.log(process.env.PORT)'; command cat .env.local"}}
+  },
+  {
+    "id": "grep-regex-class-and-star-fill-protected-name",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a grep regex whose class and star fill a protected name's last characters is not a file operand",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "grep -oE 'example\\.net[a-z]*' notes.txt"}}
+  },
+  {
+    "id": "ripgrep-url-regex-fills-protected-name",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "known-limitation",
+    "description": "a ripgrep URL regex that spells a protected dotfile shape is conservatively blocked without --no-config",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "rg -o 'https://[^ ]+\\.net[^ )]*' docs"}}
+  },
+  {
+    "id": "grep-regex-star-after-protected-prefix",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a grep regex with a star after a protected name's prefix is not a file operand",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "grep -oE 'example\\.net*' notes.txt"}}
+  },
+  {
+    "id": "grep-extension-regex",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a grep regex for a protected file extension is not a file operand",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "grep -E '\\.pem$' list.txt"}}
+  },
+  {
+    "id": "echoed-prose-names-protected-file",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "known-limitation",
+    "description": "prose that names a protected dotfile in an echo argument is conservatively blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "echo \"see .netrc docs\""}}
+  },
+  {
+    "id": "star-after-prefix-shared-with-protected-dotfile",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "known-limitation",
+    "description": "a star after a prefix shared with a protected dotfile is conservatively blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "ls -d .git*"}}
+  },
+  {
+    "id": "regex-star-before-protected-dotfile-suffix",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "the regex of a sed s command is program text and remains allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "sed 's/.*rc$//' list.txt"}}
+  },
+  {
+    "id": "address-regex-star-before-protected-dotfile-suffix",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "the same regex as a sed address is program text too and remains allowed (#494)",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "sed '/.*rc$/d' list.txt"}}
+  },
+  {
+    "id": "grep-word-containing-protected-stem",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a search word that only contains a protected stem remains allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "grep -rn 'dotenv' src"}}
+  },
+  {
+    "id": "grep-regex-rewritten-off-path-shape",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a regex rewritten so it no longer spells a protected path remains allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "grep -oE 'example\\.n[e]t/[a-z]+' notes.txt"}}
+  },
+  {
+    "id": "ordinary-node-member",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "ordinary inline Node member access remains allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "node -e 'console.log(process.argv.length)'"}}
+  },
+  {
+    "id": "explicit-public-port-script",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "explicit public PORT on a reviewed script remains allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "env PORT=43119 node server.mjs"}}
+  },
+  {
+    "id": "structured-grep-environment-member-pattern",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "structured Grep keeps a search pattern distinct from its path",
+    "event": {"tool_name": "Grep", "tool_input": {"pattern": "process\\.env\\.PORT", "path": "src"}}
+  },
+  {
+    "id": "quoted-python-subscripts-piped-state",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "python subscripts inside single quotes are not shell globs (GUI app-state pipe)",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "orca computer get-app-state --app com.anthropic.claudefordesktop --no-screenshot --json | python3 -c 'import json,sys;t=json.load(sys.stdin)[\"result\"][\"snapshot\"][\"treeText\"].splitlines();import re;[print(l) for l in t if re.search(r\"^\\s*(3[2-9]\\d|4[0-6]\\d)\\s\",l)]' | grep -v \"텍스트, Value\" | head -60"}}
+  },
+  {
+    "id": "quoted-python-subscripts-state-file",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "python subscripts inside single quotes are not shell globs (state file read)",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "orca computer get-app-state --app com.anthropic.claudefordesktop --no-screenshot --json > st.json && python3 -c 'import json;t=json.load(open(\"st.json\"))[\"result\"][\"snapshot\"][\"treeText\"].splitlines();print(\"\\n\".join(l for l in t[-80:] if \"Value\" not in l))'"}}
+  },
+  {
+    "id": "quoted-python-subscripts-minimal-word",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "the smallest word that used to trip env.* through quoted subscripts stays allowed inside its single quotes",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'json;t=json.load(open(\"st.json\"))[\"result\"][\"snapshot\"][\"treeText\"].splitlines();print(\"\\n\".join(l'"}}
+  },
+  {
+    "id": "quoted-python-subscripts-generic",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "chained quoted subscripts in a single-quoted python program stay allowed",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'x(\"a\")[\"result\"][\"snapshot\"][\"treeText\"].splitlines();print(\"\\n\".join(l))'"}}
+  },
+  {
+    "id": "quoted-subscripts-with-real-env-operand",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "quoted python subscripts do not hide a real .env operand on the same command",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'print(a[\"result\"][\"snapshot\"][\"treeText\"].splitlines())' .env"}}
+  },
+  {
+    "id": "plain-dotenv-cat",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "reading a dotenv file directly stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat .env"}}
+  },
+  {
+    "id": "dotenv-local-cat",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "reading .env.local stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat .env.local"}}
+  },
+  {
+    "id": "env-star-entry-operand",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a file operand that matches the env.* entry stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat env.production"}}
+  },
+  {
+    "id": "unquoted-bracket-glob-env-operand",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "an unquoted bracket glob that names an env file stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat e[n]v.production"}}
+  },
+  {
+    "id": "double-quoted-protected-path",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a double-quoted protected path stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat \".env.local\""}}
+  },
+  {
+    "id": "single-quoted-protected-path",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a single-quoted protected path stays blocked",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat '.env.local'"}}
+  },
+  {
+    "id": "quoted-fragments-around-unquoted-bracket",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "quoted fragments around an unquoted bracket still spell a glob onto an env file",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat '.e'[n]\"v\""}}
+  },
+  {
+    "id": "unquoted-quoted-content-bracket-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "an unquoted bracket whose members are quoted is still a glob onto an env file",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat e[\"n\"]v.production"}}
+  },
+  {
+    "id": "shell-c-quoted-subscript-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a quoted subscript handed to bash -c is a glob in the inner shell",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "bash -c 'cat e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "dot-command-reruns-quoted-subscript-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "the dot command reruns a quoted string as shell code, so its subscript is a glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": ". /dev/stdin <<< 'cat e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "python-glob-module-quoted-subscript",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a python program that expands the pattern itself reads a real glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'import glob; print(open(glob.glob(\"\"\"e[\"n\"]v.production\"\"\")[0]).read())'"}}
+  },
+  {
+    "id": "find-name-quoted-subscript-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "find expands a quoted -name pattern itself, so its subscript is a glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "find . -name 'e[\"n\"]v.production' -exec cat {} +"}}
+  },
+  {
+    "id": "python-output-command-substitution-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a python program's printed glob is expanded by the shell when substituted unquoted",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "cat $(python3 -c 'print(\"\"\"e[\"n\"]v.production\"\"\")')"}}
+  },
+  {
+    "id": "python-output-read-loop-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a python program's printed glob is expanded by the shell when read into an unquoted variable",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'print(\"\"\"e[\"n\"]v.production\"\"\")' | while read f; do cat $f; done"}}
+  },
+  {
+    "id": "python-output-written-then-sourced",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "python output written to a file and run with the dot command expands its printed glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'print(\"\"\"cat e[\"n\"]v.production\"\"\")' > code; . ./code"}}
+  },
+  {
+    "id": "python-output-written-then-executed-by-path",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "python output written to a file and run by path expands its printed glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'print(\"\"\"cat e[\"n\"]v.production\"\"\")' > code; chmod +x code; ./code"}}
+  },
+  {
+    "id": "python-regex-string-with-quoted-class",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a bracket inside a python string literal is pattern text, not a subscript",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'import re,pathlib;[print(p.read_text()) for p in pathlib.Path(\".\").iterdir() if re.fullmatch(\"\"\"e[\"n\"]v.production\"\"\",p.name)]'"}}
+  },
+  {
+    "id": "python-fstring-nested-quotes-class",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "an f-string with nested double quotes is not followed, so its brackets stay pattern text",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'import re,pathlib;[print(p.read_text()) for p in pathlib.Path(\".\").iterdir() if re.fullmatch(f\"{\"e[\"\"n\"\"]v.production\"}\",p.name)]'"}}
+  },
+  {
+    "id": "python-as-operand-of-another-interpreter",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "python3 -c as an argument of perl is not a python program, so its brackets stay pattern text",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "perl -e 'opendir(D,\".\");for(readdir(D)){if(/$ARGV[2]/){open(F,\"<\",$_);print <F>}}' python3 -c 'e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "python-template-string-nested-quotes-class",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a t-string nests quotes like an f-string, so its brackets stay pattern text",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'import re,pathlib;[print(p.read_text()) for p in pathlib.Path(\".\").iterdir() if re.fullmatch(t\"{\"e[\"\"n\"\"]v.production\"}\".interpolations[0].value,p.name)]'"}}
+  },
+  {
+    "id": "shell-function-overrides-python",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a shell function can redefine python3, so the quoted argument is not python code",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3() { perl -e 'opendir(D,\".\");for(readdir(D)){if(/$ARGV[0]/){open(F,\"<\",$_);print <F>}}' \"$2\"; }; python3 -c 'e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "path-assignment-replaces-python",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a PATH assignment can make python3 any program, so the quoted argument is not python code",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "PATH=./bin:$PATH python3 -c 'e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "heredoc-body-hides-python-prefix",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a here-document body is another program's input, so a python prefix inside it proves nothing",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "perl <<'EOF'\n$p=q{;python3 -c 'e[\"n\"]v.production'}\nEOF"}}
+  },
+  {
+    "id": "python-directory-listing-with-pattern-text",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a python program that lists a directory can match names against pattern text, so its brackets stay",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'import os;[print(x) for x in os.listdir(\".\") if x==e[\"n\"]v.production]'"}}
+  },
+  {
+    "id": "escaped-separator-before-python",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "an escaped separator is an argument, not a command boundary, so python3 -c is another program's operand",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "perl -e 'opendir(D,\".\");for(readdir(D)){if(/$ARGV[2]/){open(F,\"<\",$_);print <F>}}' \\;python3 -c 'e[\"n\"]v.production'"}}
+  },
+  {
+    "id": "env-assignment-before-python-subscripts",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "an environment assignment before python3 -c still leaves it in command position",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "PYTHONUTF8=1 python3 -c 'x(\"a\")[\"result\"][\"snapshot\"][\"treeText\"].splitlines()'"}}
+  },
+  {
+    "id": "python-output-piped-to-dot-command",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "python output piped into the dot command expands its printed glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "python3 -c 'print(\"\"\"cat e[\"n\"]v.production\"\"\")' | . /dev/stdin"}}
+  },
+  {
+    "id": "quoted-subscripts-before-unquoted-bracket-glob",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "quoted brackets earlier in the command do not hide a later unquoted bracket glob",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "echo '[\"a\"]' ; cat .e[n]\"v\""}}
+  },
+  {
+    "id": "gh-body-file-stdin-heredoc",
+    "expected_status": 0,
+    "classification": "safe-control",
+    "description": "a quoted-delimiter heredoc that gh pr create reads with --body-file - is the PR body, not a file it opens",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "gh pr create --title t --body-file - <<'EOF'\nNever commit .env or key.p8.\nEOF"}}
+  },
+  {
+    "id": "gh-body-file-stdin-heredoc-piped-to-shell",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "a pipe after the message command keeps the heredoc body in the protected-path match",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "gh pr create --title t --body-file - <<'EOF' | sh\ncat .env\nEOF"}}
+  },
+  {
+    "id": "gh-body-file-stdin-unquoted-delimiter",
+    "expected_status": 2,
+    "expected_reason": "bash_protected_path_text_match",
+    "classification": "true-positive",
+    "description": "an unquoted delimiter expands the body, so its substitutions stay in the match",
+    "event": {"tool_name": "Bash", "tool_input": {"command": "gh pr create --title t --body-file - <<EOF\n$(cat .env)\nEOF"}}
+  }
+]

@@ -1,0 +1,1051 @@
+[
+  {
+    "id": "sh-squote-no-escape",
+    "rule": "sh_squote: a quote inside the value is escaped",
+    "old": "  printf '%s' \"$1\" | sed \"s/'/'\\\\\\\\''/g\"",
+    "new": "  printf '%s' \"$1\"",
+    "tests": [
+      "tests/unit-core.sh"
+    ]
+  },
+  {
+    "id": "version-newer-always",
+    "rule": "version_newer: only a strictly newer version is newer",
+    "old": "  semver_at_least \"$2\" \"$1\"\n  [ \"$?\" -eq 1 ]",
+    "new": "  semver_at_least \"$2\" \"$1\"\n  [ \"$?\" -ge 0 ]",
+    "tests": [
+      "tests/unit-core.sh"
+    ]
+  },
+  {
+    "id": "frame-json-no-us-escape",
+    "rule": "frame_json_string_leaves: US inside a leaf is escaped",
+    "old": "    | (split(\"\\u001f\") | join(\"\\u001f\\u001f\"))\n",
+    "new": "",
+    "tests": [
+      "tests/unit-framing.sh"
+    ]
+  },
+  {
+    "id": "frame-plaintext-no-us-escape",
+    "rule": "frame_plaintext_leaf: US inside a leaf is escaped",
+    "old": "      gsub(escape, escape escape)\n",
+    "new": "",
+    "tests": [
+      "tests/unit-framing.sh"
+    ]
+  },
+  {
+    "id": "deny-hex-no-e",
+    "rule": "deny_path_char_hex_pattern: a letter also matches its hex escape",
+    "old": "d|D) sx_hex='6[4]' ;; e|E) sx_hex='6[5]' ;;",
+    "new": "d|D) sx_hex='6[4]' ;; e|E) return 1 ;;",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "deny-shell-no-glob-char",
+    "rule": "deny_path_shell_expansion_char_pattern: ? and * stand for a character",
+    "old": "sx_char=\"($sx_char_literal|\\\\\\\\x$sx_hex|\\\\?|\\\\*|$sx_bracket)\"",
+    "new": "sx_char=\"($sx_char_literal|\\\\\\\\x$sx_hex|$sx_bracket)\"",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "deny-shell-dot-no-hex",
+    "rule": "deny_path_shell_expansion_char_pattern: a dot also matches its hex escape",
+    "old": "        sx_char=\"($sx_char_literal|\\\\\\\\x$sx_hex)\"\n",
+    "new": "        sx_char=$sx_char_literal\n",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "deny-pin-no-hex",
+    "rule": "deny_path_pin_char_pattern: a pinned character also matches its hex escape",
+    "old": "    sx_pin=\"($1|\\\\[[^]]*$1[^]]*\\\\]|\\\\\\\\x$sx_hex)\"",
+    "new": "    sx_pin=\"($1|\\\\[[^]]*$1[^]]*\\\\])\"",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "key-locator-clock-time",
+    "rule": "secretish_env_values key-name exemption: a clock time is not a line locator",
+    "old": "if (match(head, /^[0-9]+[:-]/) && RLENGTH > best) best = RLENGTH",
+    "new": "if (match(head, /^[0-9:]+[:-]/) && RLENGTH > best) best = RLENGTH",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-locator-no-letter",
+    "rule": "secretish_env_values key-name exemption: a locator path holds a letter",
+    "old": "      if (w !~ /[A-Za-z]/) return best\n",
+    "new": "",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-locator-mixed-separators",
+    "rule": "secretish_env_values key-name exemption: both locator separators are the same",
+    "old": "if (match(substr(head, n + 1), /^:[0-9]+:/) && n + RLENGTH > best)",
+    "new": "if (match(substr(head, n + 1), /^:[0-9]+[:-]/) && n + RLENGTH > best)",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-locator-cat-n-space",
+    "rule": "secretish_env_values key-name exemption: cat -n numbers end with a tab",
+    "old": "if (match(head, /^[ \\t]*[0-9]+\\t/)) best = RLENGTH",
+    "new": "if (match(head, /^[ \\t]*[0-9]+[ \\t]/)) best = RLENGTH",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-line-start-limit",
+    "rule": "secretish_env_values key-name exemption: no line-start reading past 1024 bytes",
+    "old": "&& start + matched_length - 1 <= 1024) {",
+    "new": "&& start + matched_length - 1 <= 1048576) {",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-line-start-unanchored",
+    "rule": "secretish_env_values key-name exemption: the field starts its line",
+    "old": "key_line_start = (head ~ /^[+-]?[ \\t\\r]*((export",
+    "new": "key_line_start = (head ~ /[+-]?[ \\t\\r]*((export",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "key-names-field-any-word",
+    "rule": "secretish_env_values key-name exemption: every value word names the field or is listed",
+    "old": "        else if (!(vw[i] in ident_word) && !(vw[i] in root_word)) return 0",
+    "new": "        else if (0) return 0",
+    "tests": [
+      "tests/key-name-masking.sh"
+    ]
+  },
+  {
+    "id": "handback-tail-words-4",
+    "rule": "hand-back exemptions (#607): an English tail needs eight words",
+    "old": "      prose_tail_words = 8",
+    "new": "      prose_tail_words = 4",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-wrapped-word-cap",
+    "rule": "hand-back exemptions (#607): a quoted or bracketed English word is at most six letters",
+    "old": "&& w !~ hangul && length(w) > 6)",
+    "new": "&& w !~ hangul && length(w) > 60)",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-closed-quote-even",
+    "rule": "closed_key_quote (#607): the quote must still be open before the key",
+    "old": "      if (gsub(quote, quote, before) % 2 == 0) return 0\n",
+    "new": "",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-closed-quote-glued",
+    "rule": "closed_key_quote (#607): the opening quote stands after a blank or an opener",
+    "old": "      if (RSTART > 1 && substr(before, RSTART - 1, 1) !~ /[ \\t([{*>]/) return 0\n",
+    "new": "",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-note-needs-space",
+    "rule": "empty_note (#607): a note of several words needs a space after =",
+    "old": "        if (leading == \"\") return 0\n        marked = note_marked(inner)",
+    "new": "        marked = note_marked(inner)",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-note-unmarked",
+    "rule": "empty_note (#607): a note of several words must be marked as prose",
+    "old": "        marked = note_marked(inner)",
+    "new": "        marked = 1",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-operator-default",
+    "rule": "operator_reference (#607): the operand is empty",
+    "old": "return value ~ /^\\$\\{[A-Za-z_][A-Za-z0-9_]*:?[-=?+]\\}$/",
+    "new": "return value ~ /^\\$\\{[A-Za-z_][A-Za-z0-9_]*:?[-=?+][^}]*\\}$/",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-tail-next-lines",
+    "rule": "exempt_tail (#607): the lines below an exempt token are prose too",
+    "old": "      return !prose_tail(glued) || !prose_tail(leaf_tail)",
+    "new": "      return !prose_tail(glued)",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-sentence-one-word",
+    "rule": "prose_sentence (#607): a sentence has three or more words",
+    "old": "      if (count < 3) return 0\n      marker = note_marked(raw)",
+    "new": "      if (count < 1) return 0\n      marker = note_marked(raw)",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-sentence-comment",
+    "rule": "prose_sentence (#607): a # or // comment keeps the old reading",
+    "old": "        if (w ~ /^#/ || w == \"//\") return 0\n",
+    "new": "",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-sentence-span",
+    "rule": "prose_sentence (#607): every word passes span_words",
+    "old": "      if (span_words(raw) < 0) found = 1\n",
+    "new": "",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-angle-unmarked",
+    "rule": "spaced_angle (#607): the words inside must be marked as prose",
+    "old": "      return note_marked(inner)\n    }\n    # A markdown label",
+    "new": "      return 1\n    }\n    # A markdown label",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-note-marked-any",
+    "rule": "note_marked (#607): only Korean or placeholder words mark prose",
+    "old": "      return hangul_word || !other_word",
+    "new": "      return 1",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-value-word-short",
+    "rule": "value_word (#607): a four-character mix of letters and digits is a value",
+    "old": "|| (length(w) >= 4 && w ~ /^[A-Za-z0-9]+$/",
+    "new": "|| (length(w) >= 40 && w ~ /^[A-Za-z0-9]+$/",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-hangul-range",
+    "rule": "hangul (#607): Hangul syllables end at U+D7A3",
+    "old": "|\\355\\236[\\200-\\243])\"",
+    "new": "|\\355\\236[\\200-\\277])\"",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-closed-off-glued",
+    "rule": "closed_off (#607): text glued to the token belongs to the value",
+    "old": "      return rest == \"\" || rest == \"\\r\" || ch == \" \" || ch == \"\\t\"",
+    "new": "      return 1",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "handback-path-digits",
+    "rule": "span_words (#607): a path-shaped word has parts of letters only",
+    "old": "[A-Za-z]+([\\/.-][A-Za-z]+)*(\\.(mp3|mp4|sha256|x509))?",
+    "new": "[A-Za-z0-9]+([\\/.-][A-Za-z0-9]+)*(\\.(mp3|mp4|sha256|x509))?",
+    "tests": [
+      "tests/prompt-prose-placeholder.sh",
+      "tests/prompt-prose-reference.sh",
+      "tests/handback-values.sh"
+    ]
+  },
+  {
+    "id": "bash-awk-getline",
+    "rule": "awk line filter (#624): getline is refused",
+    "old": "if (v ~ /getline|system|[|@`]|ARGV|ARGC|SYMTAB|FUNCTAB/",
+    "new": "if (v ~ /system|[|@`]|ARGV|ARGC|SYMTAB|FUNCTAB/",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-awk-symtab",
+    "rule": "awk line filter (#624): gawk SYMTAB is refused",
+    "old": "if (v ~ /getline|system|[|@`]|ARGV|ARGC|SYMTAB|FUNCTAB/",
+    "new": "if (v ~ /getline|system|[|@`]|ARGV|ARGC|FUNCTAB/",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-awk-print-redirect",
+    "rule": "awk line filter (#624): a print redirected to a name is refused",
+    "old": "|| v ~ />/ && v ~ /print/) return 0",
+    "new": ") return 0",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-awk-program-file",
+    "rule": "awk line filter (#624): no option but -F and -v",
+    "old": "        if (substr(v, 1, 1) == \"-\") return 0\n        break",
+    "new": "        break",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-sink-xargs",
+    "rule": "search pattern exemption (#616): the pipeline feeds only plain text filters",
+    "old": "} else if (wv[f] !~ /^(wc|head|tail|sort|uniq|tr|cut|nl|grep|egrep|fgrep|column|cat|jq)$/) return 0",
+    "new": "} else if (wv[f] !~ /^(wc|head|tail|sort|uniq|tr|cut|nl|grep|egrep|fgrep|column|cat|jq|xargs)$/) return 0",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-sink-sort-o",
+    "rule": "search pattern exemption (#616): sort -o is not a plain filter",
+    "old": "if (bad(g) || substr(wv[g], 1, 2) == \"--\" || wv[f] == \"sort\" && wv[g] ~ /^-[A-Za-z]*o/) return 0",
+    "new": "if (bad(g) || substr(wv[g], 1, 2) == \"--\") return 0",
+    "tests": [
+      "tests/search-operand-ground-truth.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-git-ls-files-any",
+    "rule": "search pattern exemption (#616): git counts as inert only for ls-files into a pipe",
+    "old": "if (w[a] == \"git\") return a < b && w[a + 1] == \"ls-files\" && b < n && w[b + 1] == \"|\"",
+    "new": "if (w[a] == \"git\") return 1",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-neutralize-path-assign",
+    "rule": "deny pattern search exemption (#616): a PATH assignment turns it off",
+    "old": " || w[k] ~ /\\(\\)/ || w[k] ~ /^PATH=/) exit 1",
+    "new": " || w[k] ~ /\\(\\)/) exit 1",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-neutralize-before-any",
+    "rule": "deny pattern search exemption (#616): only known options may stand before a data word",
+    "old": "    function before_ok(p) {\n",
+    "new": "    function before_ok(p) {\n      return 1\n",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-neutralize-pipe-xargs",
+    "rule": "deny pattern search exemption (#616): the pipeline feeds only plain text filters",
+    "old": "if (j + 1 > n || w[j + 1] !~ /^(wc|head|tail|sort|uniq|tr|cut|nl|grep|egrep|fgrep|column|cat)$/) { ok = 0; break }",
+    "new": "if (j + 1 > n || w[j + 1] !~ /^(wc|head|tail|sort|uniq|tr|cut|nl|grep|egrep|fgrep|column|cat|xargs)$/) { ok = 0; break }",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-neutralize-redirect",
+    "rule": "deny pattern search exemption (#616): only stderr may be redirected",
+    "old": "for (k = s; k <= e; k++) if (w[k] ~ /[<>]/ && !literal(w[k]) && w[k] !~ /^2>(&1|\\/dev\\/null)$/) ok = 0",
+    "new": "for (k = s; k <= e; k++) ;",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-ssh",
+    "rule": "bash_shell_program_texts (#616): ssh runs its quoted words",
+    "old": "if (i <= m && base(seg[i]) ~ /^(eval|ssh|trap|watch|su)$/) all = 1",
+    "new": "if (i <= m && base(seg[i]) ~ /^(eval|trap|watch|su)$/) all = 1",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-dash-lc",
+    "rule": "bash_shell_program_texts (#616): a -c inside a flag cluster (-lc) counts",
+    "old": "if (seg[j] ~ /^-[A-Za-z]*c$/) { only = j + 1; break }",
+    "new": "if (seg[j] == \"-c\") { only = j + 1; break }",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-exclude-no-index",
+    "rule": "exclude pathspec (#616): --no-index turns the exemption off",
+    "old": "*GIT_LITERAL_PATHSPECS*|*--literal-pathspecs*|*--no-index*) git_state=off ;;",
+    "new": "*GIT_LITERAL_PATHSPECS*|*--literal-pathspecs*) git_state=off ;;",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-exclude-expansion",
+    "rule": "exclude pathspec (#616): a $ in the excluded name refuses it",
+    "old": "        ':(exclude)'*) value=${value#':(exclude)'} ;;\n        *) return 1 ;;\n      esac\n      case \"$value\" in\n        *[[:space:]]*|*\\'*|*\\\"*|*'$'*|",
+    "new": "        ':(exclude)'*) value=${value#':(exclude)'} ;;\n        *) return 1 ;;\n      esac\n      case \"$value\" in\n        *[[:space:]]*|*\\'*|*\\\"*|",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-message-set-file-option",
+    "rule": "message values (#620): --comment-file of orca bot item set names a file",
+    "old": "\"|--comment|--title|--description|--done-means|--note|--reason|--ask|--option|\"",
+    "new": "\"|--comment|--comment-file|--title|--description|--done-means|--note|--reason|--ask|--option|\"",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-message-option-value",
+    "rule": "message values (#624): an option-shaped value is not a message",
+    "old": "(substr(word[j + 1], 1, 1) != \"-\" || word[j + 1] ~ /^-[ \\t]/)) out = out rec[j + 1] \"\\n\"",
+    "new": "(1)) out = out rec[j + 1] \"\\n\"",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-message-pipe-target",
+    "rule": "message values (#616): a command piped after a message command must be inert",
+    "old": "      if (pipe_target && !(all && inert())) bail()\n",
+    "new": "",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-message-quiet-redirect",
+    "rule": "message values (#624): only 2>&1 and /dev/null redirections are quiet",
+    "old": "        if (word[j] ~ /^[12]?>\\/dev\\/null$/) continue",
+    "new": "        if (word[j] ~ /^[12]?>/) continue",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-message-git-before-commit",
+    "rule": "message values (#624): only git add and git status may come before git commit -m",
+    "old": "word[2] ~ /^(add|status)$/ && quiet_none()) ok = 0",
+    "new": "word[2] ~ /./ && quiet_none()) ok = 0",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-message-plain-word",
+    "rule": "message values (#620): a value with $ or a backquote is not literal",
+    "old": "      return v !~ /[$`]/\n    }'",
+    "new": "      return 1\n    }'",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/bash-path-text-data.sh"
+    ]
+  },
+  {
+    "id": "bash-last-argument-bare-only",
+    "rule": "bash_uses_last_argument (#624): $_ followed by text or in braces counts",
+    "old": "    *'$_'|*'$_'[!A-Za-z0-9_]*|*'${_'[!A-Za-z0-9_]*) return 0 ;;",
+    "new": "    *'$_') return 0 ;;",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/heredoc-body-text.sh"
+    ]
+  },
+  {
+    "id": "bash-orca-cli-any-value",
+    "rule": "orca_cli_word_mark (#624): ORCA_CLI_COMMAND must be orca or an absolute path to orca",
+    "old": "      ;;\n    *) return 1 ;;\n  esac\n  OC_CMD=$1",
+    "new": "      ;;\n    *) ;;\n  esac\n  OC_CMD=$1",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/heredoc-body-text.sh"
+    ]
+  },
+  {
+    "id": "bash-orca-cli-name-spelled",
+    "rule": "orca_cli_word_mark (#624): the command spells the variable name nowhere else",
+    "old": "    if (index(out, \"ORCA_CLI_COMMAND\")) exit 1\n",
+    "new": "",
+    "tests": [
+      "tests/message-value-prose.sh",
+      "tests/heredoc-body-text.sh"
+    ]
+  },
+  {
+    "id": "bash-heredoc-other-mention",
+    "rule": "heredoc_reused_as_body_file (#624): the file appears only as a body-file value",
+    "old": "      if (c != v) exit 1\n",
+    "new": "",
+    "tests": [
+      "tests/heredoc-body-text.sh",
+      "tests/message-value-prose.sh"
+    ]
+  },
+  {
+    "id": "bash-data-exemptions-last-argument",
+    "rule": "bash_deny_path_scan (#624): a command using $_ gets no data exemption",
+    "old": "  if ! bash_uses_last_argument \"$deny_cmd\"; then\n    deny_cmd=$(bash_strip_heredoc_bodies \"$deny_cmd\")",
+    "new": "  if true; then\n    deny_cmd=$(bash_strip_heredoc_bodies \"$deny_cmd\")",
+    "tests": [
+      "tests/heredoc-body-text.sh",
+      "tests/message-value-prose.sh"
+    ]
+  },
+  {
+    "id": "git-commit-edit-flag-ignored",
+    "rule": "message_value_records: git commit -e/--edit keeps the message in the scan",
+    "old": "        if (commit && git_edits()) out = substr(out, 1, before)\n",
+    "new": "",
+    "tests": [
+      "tests/message-value-prose.sh"
+    ]
+  },
+  {
+    "id": "git-global-c-alias-taken",
+    "rule": "message_value_records: git -c alias.* before commit gets no message exemption",
+    "old": " || word[j] == \"-c\" && tolower(word[j + 1]) ~ /^alias\\./) return 0",
+    "new": ") return 0",
+    "tests": [
+      "tests/message-value-prose.sh"
+    ]
+  },
+  {
+    "id": "colon-assignment-no-walk-back",
+    "rule": "find_assignment: a colon assignment after a whitespace run starts where the run starts",
+    "old": "      if (delimiter == \":\")\n        while (assignment_start > 1",
+    "new": "      if (0)\n        while (assignment_start > 1",
+    "tests": [
+      "tests/colon-assignment-equivalence.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-eval-flag",
+    "rule": "perl_script_without_regex: the e flag runs the replacement as code",
+    "old": "index(\"gimsx\", substr(t, i, 1))",
+    "new": "index(\"gimsxe\", substr(t, i, 1))",
+    "tests": [
+      "tests/unit-deny-path.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-other-statement",
+    "rule": "perl_script_without_regex: a statement that is not a substitution keeps the whole program",
+    "old": "index(\"/|#,!%\", d) == 0) exit 1",
+    "new": "index(\"/|#,!%\", d) == 0) { printf \"%s\", out substr(t, i); exit 0 }",
+    "tests": [
+      "tests/unit-deny-path.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-colon-delimiter",
+    "rule": "perl_script_without_regex: an escaped `:` delimiter becomes part of a package name",
+    "old": "index(\"/|#,!%\", d)",
+    "new": "index(\"/|#,:!%\", d)",
+    "tests": [
+      "tests/unit-deny-path.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-code-block",
+    "rule": "perl_script_without_regex: a code block in a pattern is code",
+    "old": " || t ~ /\\((\\?+[a-z]*|\\*)\\{/) exit 1",
+    "new": ") exit 1",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-pattern-variable",
+    "rule": "perl_script_without_regex: a variable in a pattern is interpolated",
+    "old": "        if (c == \"$\" && x != d && x != \")\" && x != \"|\") exit 1\n",
+    "new": "",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-replacement-array",
+    "rule": "perl_script_without_regex: an array in a replacement is interpolated",
+    "old": "x !~ /[1-9]/ || c == \"@\" || c",
+    "new": "x !~ /[1-9]/ || c",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-subscript",
+    "rule": "perl_script_without_regex: a subscript after $1 is an expression",
+    "old": "index(\"[{:-0123456789\", substr(t, i + 2, 1))",
+    "new": "index(\":-0123456789\", substr(t, i + 2, 1))",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-backref-subscript",
+    "rule": "perl_script_without_regex: perl reads \\1 in a replacement as $1, subscript and all",
+    "old": "(c == \"$\" || c == \"\\\\\" && x ~ /[1-9]/) && index(",
+    "new": "c == \"$\" && index(",
+    "tests": [
+      "tests/unit-deny-path.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-control-escape",
+    "rule": "perl_script_without_regex: \\c takes the next byte, so the escape pairs are off by one",
+    "old": "if (c == \"\\\\\") { if (x == \"c\") exit 1; i++; continue }",
+    "new": "if (c == \"\\\\\") { i++; continue }",
+    "tests": [
+      "tests/unit-deny-path.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-option-after",
+    "rule": "perl_kind: perl reads an option after the program, such as a second -e",
+    "old": "      for (k = j + 2; k <= pn; k++) if (substr(wv[pw[k]], 1, 1) == \"-\") return \"pl\"\n",
+    "new": "",
+    "tests": [
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-no-loop",
+    "rule": "perl_kind: only perl -pe and perl -ne qualify",
+    "old": "return loop ? \"pls\" : \"pl\"",
+    "new": "return \"pls\"",
+    "tests": [
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "perl-sub-other-option",
+    "rule": "perl_kind: no option but -l, -0 and -C beside -p, -n and -e",
+    "old": "\"^-([lnp]|0[0-7]*|C[0-9IOEioASDLa]*)$\"",
+    "new": "\"^-([lnpw]|0[0-7]*|C[0-9IOEioASDLa]*)$\"",
+    "tests": [
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-cd-home-any-operand",
+    "rule": "program text after a home-relative cd (#636): only `~` or `~/literal/path` is read as $HOME",
+    "old": "match(s, /[;&|][ \\t]*cd[ \\t]+~(\\/[A-Za-z0-9_.\\/:@%+,=-]*)?([ \\t;&|]|$)/)",
+    "new": "match(s, /[;&|][ \\t]*cd[ \\t]+~/)",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-home-any-word",
+    "rule": "home_is_plain_path (#636): a $HOME with a blank, glob or `..` step is no plain word",
+    "old": "  case $HOME in *[!A-Za-z0-9_./@%+,:-]*|*/../*|*/..) return 1 ;; esac\n",
+    "new": "",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-assign-any-name",
+    "rule": "assignment-only segments (#630, #636): an assignment to a name such as PATH stops the reading",
+    "old": "            if (name in vbad) break\n",
+    "new": "",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-program-var-any-segment",
+    "rule": "plain_var (#636): only an assignment that starts the line or follows `;` and feeds no pipe gives a variable its value",
+    "old": " && (wseg[r] == 1 || segsemi[wseg[r]]) && !segpipe[wseg[r]]) {",
+    "new": ") {",
+    "tests": [
+      "tests/bash-path-text-data.sh",
+      "tests/search-operand-ground-truth.sh"
+    ]
+  },
+  {
+    "id": "bash-gh-jq-short-any-option",
+    "rule": "gh --jq (#647): only -q is the short form of --jq",
+    "old": "wv[k] != \"--jq\" && wv[k] != \"-q\")) continue",
+    "new": "wv[k] != \"--jq\" && wv[k] !~ /^-[A-Za-z]$/)) continue",
+    "tests": [
+      "tests/gh-jq-option.sh"
+    ]
+  },
+  {
+    "id": "bash-gh-jq-prev-any-option",
+    "rule": "gh --jq (#647): no option before -q or --jq may take it as its value",
+    "old": "        if (substr(prev, 1, 1) == \"-\" && prev !~ /^(--paginate|--slurp|--include|-i|--silent|--verbose)$/) return 0\n        return k\n",
+    "new": "        return k\n",
+    "tests": [
+      "tests/gh-jq-option.sh"
+    ]
+  },
+  {
+    "id": "bash-gh-jq-any-subcommand",
+    "rule": "gh --jq (#647): only built-in queries that take --jq qualify",
+    "old": "      if (jq) return sub1 ~ /^(api|run view|run list|pr view|pr list|pr checks|pr status|issue view|issue list|issue status|release view|release list|repo view|repo list)$/\n",
+    "new": "      if (jq) return 1\n",
+    "tests": [
+      "tests/gh-jq-option.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-heredoc-unscanned",
+    "rule": "bash_file_write_env_names: an unquoted here-document body is read for expansions",
+    "old": "          hd_expand[hd_n] = (w !~ /[\\047\"\\\\]/)\n",
+    "new": "          hd_expand[hd_n] = 0\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-redirect-ignored",
+    "rule": "bash_file_write_env_names: a > or >> redirect to a file marks the pipeline",
+    "old": "          else kind = \"file\"\n",
+    "new": "          else kind = \"dev\"\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-no-braced-name",
+    "rule": "bash_file_write_env_names: a ${NAME} expansion names its variable",
+    "old": "      if (braced) {\n        q++\n",
+    "new": "      if (braced) {\n        return q\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-pipe-splits",
+    "rule": "bash_file_write_env_names: a pipe does not end the unit a redirect covers",
+    "old": " || (c == \"|\" && substr(s, i + 1, 1) == \"|\")) {\n",
+    "new": " || c == \"|\") {\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-dquote-skipped",
+    "rule": "bash_file_write_env_names: an expansion inside double quotes is read",
+    "old": "          else if (c == \"$\") { i = dollar(s, i, 0); continue }\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-not-wired",
+    "rule": "check_bash_command: a secret-named variable written to a file blocks",
+    "old": "    env_names_include_secretish $sw_names\n    case \"$?\" in\n",
+    "new": "    env_names_include_secretish $sw_names\n    case \"1\" in\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-newline-ends-pipe",
+    "rule": "bash_file_write_env_names: a newline after a pipe continues the pipeline",
+    "old": "          if (!pipe_open) flush()\n",
+    "new": "          flush()\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-shell-program-skipped",
+    "rule": "check_bash_command: the program of bash -c is read for secret variable writes",
+    "old": "          [ -z \"$sw_program\" ] || sw_texts=\"$raw_cmd\n$sw_program\"\n",
+    "new": "          :\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-devnull-is-file",
+    "rule": "bash_file_write_env_names: a redirect to /dev/null writes no file",
+    "old": "          if (t == \"/dev/null\") kind = \"null\"\n",
+    "new": "          if (t == \"/dev/null\") kind = \"file\"\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-group-drops-names",
+    "rule": "bash_file_write_env_names: a group passes its names to the command around it",
+    "old": "      names[d] = names[d] all\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-heredoc-null-ignored",
+    "rule": "bash_file_write_env_names: a here-document read by a /dev/null command writes no file",
+    "old": "      for (h = hd_mark + 1; h <= hd_n; h++) hd_null[h] = (fdk[d, 1] == \"null\")\n",
+    "new": "      for (h = hd_mark + 1; h <= hd_n; h++) hd_null[h] = 1\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-sh-c-program-literal",
+    "rule": "bash_file_write_env_names: the program word of sh -c is read as a group in place",
+    "old": "          else if (shell_word[d] && w ~ /^-[A-Za-z]*c$/) want_prog[d] = 1\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-dup-ignored",
+    "rule": "bash_file_write_env_names: >&2 sends standard output where descriptor 2 points",
+    "old": "            if (m != \"\") { kind = (((d, m) in fdk) ? fdk[d, m] : \"\"); set_fd(fd, kind); i = j; continue }\n",
+    "new": "            if (m != \"\") { set_fd(fd, \"null\"); i = j; continue }\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-dquote-cmdsub-text",
+    "rule": "bash_file_write_env_names: a command substitution inside double quotes is shell code",
+    "old": "          else if (c == \"$\" && substr(s, i + 1, 1) == \"(\") { dq = 0; open_group(1); i += 2; continue }\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-word-skipped",
+    "rule": "bash_file_write_env_names: an expansion inside a word (token=$X) is read",
+    "old": "          cmdpos = 0\n          i++\n          continue\n        }\n",
+    "new": "          cmdpos = 0\n          i = e\n          continue\n        }\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-null-output-kept",
+    "rule": "bash_file_write_env_names: output sent to /dev/null does not reach a later command",
+    "old": "      if (fdk[d, 1] != \"\") names[d] = \"\"\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-case-paren-closes",
+    "rule": "bash_file_write_env_names: a ) in a case group ends a pattern, not the group",
+    "old": "        if (c == \")\" && d > 0 && case_group[d]) { flush(); i++; continue }\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-inherited-stderr-lost",
+    "rule": "bash_file_write_env_names: >&2 in a group reaches the group's 2> file",
+    "old": "      if (fdk[d, 2] == \"file\") emit(err_names[d])\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-null-heredoc-flows",
+    "rule": "bash_file_write_env_names: a here-document read by a /dev/null command adds no name",
+    "old": "          if (!hd_expand[h] || hd_null[h]) continue\n",
+    "new": "          if (!hd_expand[h]) continue\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "bash-secret-write-test-prints",
+    "rule": "bash_file_write_env_names: test and [ print nothing of their operands",
+    "old": "          if (cmdpos && bw ~ /^(test|\\[|\\[\\[)$/) no_out[d] = 1\n",
+    "new": "\n",
+    "tests": [
+      "tests/secret-env-file-write.sh"
+    ]
+  },
+  {
+    "id": "key-file-path-segment",
+    "rule": "key_file_path: no segment may be a value",
+    "old": "        if (credential_shaped(parts[i]) || value_word(parts[i])) return 0",
+    "new": "        if (0) return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "key-file-path-unquoted-tail",
+    "rule": "emit_value: text after an unquoted path must be prose",
+    "old": "          if (!path_tail(assignment, substr(raw, length(token) + 1))) return 0",
+    "new": "          return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "key-file-path-quoted-tail",
+    "rule": "emit_value: text after a quoted path must be prose",
+    "old": "          if (!path_tail(assignment, substr(raw, end + 1))) return 0",
+    "new": "          return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "empty-quotes-glued-word",
+    "rule": "emit_value: a word glued to closing quotes is read as the value",
+    "old": "        if (substr(source, glued, 1) ~ /^[A-Za-z0-9_$]$/) {",
+    "new": "        if (0) {",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "your-placeholder-words",
+    "rule": "fill_in_placeholder: every word after your is a placeholder word",
+    "old": "      for (i = 2; i <= n; i++) if (!(words[i] in placeholder_word)) return 0",
+    "new": "      for (i = 2; i <= n; i++) if (0) return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "key-file-path-root",
+    "rule": "key_file_path: an absolute path starts at a filesystem root",
+    "old": "      if (value ~ /^\\// && value !~ /^\\/(run|etc|var|home|Users|opt|srv|tmp|mnt|secrets|usr)\\//) return 0\n",
+    "new": "",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "path-tail-fence-only",
+    "rule": "path_tail: only a bare fence line is left out",
+    "old": "        if (lines[i] !~ /^[ \\t]*```[ \\t\\r]*$/)",
+    "new": "        if (lines[i] !~ /^[ \\t]*```/)",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "path-raw-probe-unquoted",
+    "rule": "emit_value: a raw probe keeps an unquoted path or placeholder",
+    "old": "        if (record_mode != \"probe_raw\" \\\n            && (key_file_path(value) || fill_in_placeholder(value))) {\n          if (!path_tail(assignment, substr(raw, length(token) + 1))) return 0",
+    "new": "        if ((key_file_path(value) || fill_in_placeholder(value))) {\n          if (!path_tail(assignment, substr(raw, length(token) + 1))) return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  },
+  {
+    "id": "path-raw-probe-quoted",
+    "rule": "emit_value: a raw probe keeps a quoted path or placeholder",
+    "old": "        if (record_mode != \"probe_raw\" \\\n            && (key_file_path(value) || fill_in_placeholder(value))) {\n          if (!path_tail(assignment, substr(raw, end + 1))) return 0",
+    "new": "        if ((key_file_path(value) || fill_in_placeholder(value))) {\n          if (!path_tail(assignment, substr(raw, end + 1))) return 0",
+    "tests": [
+      "tests/prompt-empty-path-placeholder.sh"
+    ]
+  }
+]

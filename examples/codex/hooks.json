@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_GUARD_HOOK_HOST=codex ./plugins/agent-guard/bin/agent-guard hook-pre-tool",
+            "timeout": 60,
+            "statusMessage": "agent-guard: checking tool call"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Agent|Task|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_GUARD_HOOK_HOST=codex ./plugins/agent-guard/bin/agent-guard hook-post-tool",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning tool output"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_GUARD_HOOK_HOST=codex ./plugins/agent-guard/bin/agent-guard hook-stop",
+            "timeout": 20,
+            "statusMessage": "agent-guard: scanning changes"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_GUARD_HOOK_HOST=codex ./plugins/agent-guard/bin/agent-guard hook-session-start",
+            "timeout": 5,
+            "statusMessage": "agent-guard: checking setup"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_GUARD_HOOK_HOST=codex ./plugins/agent-guard/bin/agent-guard hook-user-prompt",
+            "timeout": 10,
+            "statusMessage": "agent-guard: scanning prompt"
+          }
+        ]
+      }
+    ]
+  }
+}
