@@ -1,0 +1,182 @@
+# Privacy and Data Handling
+
+Last updated: 2026-11-23
+
+Agent Guard is local by default. The project does not operate an Agent Guard
+service, account system, telemetry collector, crash reporter, or analytics
+endpoint. Default hook processing does not transmit inspected data. It does not
+retain it after the hook or command finishes. It maintains a
+default-on, metadata-only local support log; the log records no inspected
+content.
+
+## What the plugin processes
+
+When enabled, Agent Guard registers hooks for `SessionStart`, `UserPromptSubmit`,
+`PreToolUse`, `PostToolUse`, and `Stop`, plus `PostToolUseFailure` on Claude
+Code.
+
+| Surface | Data inspected | Purpose | Persistent storage |
+|---|---|---|---|
+| `UserPromptSubmit` | The full text of the prompt the user submits | Block (or, opt-in, warn about) secret-like values and opt-in PII classes before the prompt reaches the model or the transcript | None |
+| `PreToolUse` | Matched tool names and inputs, including paths, proposed content, shell commands, URLs/search queries, and MCP arguments | Block deny-listed reads, credential-dumping commands, secret-like input, and opt-in PII classes before execution | None |
+| `PostToolUse` | Matched tool outputs; after mutation tools, changed and untracked files in the current Git work tree | Mask secret-like output and opt-in PII; detect secrets written to the work tree | None |
+| `PostToolUseFailure` (Claude Code) | The error text of a failed matched tool call | Detect secret-like values in failure output, which the host does not let a hook mask, and warn the model without repeating the value | None |
+| `Stop` | Changed and untracked files in the current Git work tree | Final working-tree secret scan | None |
+| `SessionStart` | Dependency availability and Agent Guard shell-integration version marker | Report degraded setup or version drift | None |
+| CLI and shell wrappers | Only stdin, paths, or command output explicitly passed by the user | On-demand scan or masking | None |
+| Local support log | Random local `run_id`, version, command/event category, host, start/finish time, exit status, and coarse outcome | Diagnose a local installation without retaining inspected data | Local metadata only; no content, paths, environment variables, host session IDs, or arbitrary tool names |
+
+Temporary scan reports and provider responses are created under a single
+per-invocation directory inside the operating system temporary directory and
+removed by a cleanup trap when the operation exits — including on the
+interrupting signals a host sends: SIGTERM when it ends a hook at its timeout,
+SIGINT on Ctrl-C, and SIGHUP when the terminal closes. An un-trappable SIGKILL
+(Codex ends a hook that reaches its timeout with one) leaves the directory
+behind; a later Agent Guard run that has its local state directory removes
+such a directory once it is more than 61 minutes old and the process that made
+it has ended (a week old for a directory from an earlier version, whose name
+does not record that process), checking at most once an hour. With
+`AGENT_GUARD_LOG_MODE=off` and no `AGENT_GUARD_SCAN_CACHE=on` there is no
+local state directory and nothing removes them. Nothing removes them either
+from a relative temp path or from a temp directory where another user could
+replace an entry (writable by others without the sticky bit, or through an
+ACL); in each of these cases `agent-guard doctor` reports how many there are
+and why, so they can be removed by hand. Agent Guard does not write inspected tool content to its own
+log or database. The host application may independently retain tool inputs and
+outputs under its own privacy policy.
+
+## Local support log
+
+Agent Guard writes metadata-only JSONL records under
+`$XDG_STATE_HOME/agent-guard` or, when that variable is unset,
+`~/.local/state/agent-guard`. It creates a start record and completes it with
+one of `pass`, `blocked`, `masked`, `warned`, `degraded`, `error`, or `interrupted`.
+The `run_id` is a random local invocation-correlation value, not a host session
+identifier.
+`pass` only means the invocation returned without a block; it is not evidence
+that every scanner or host route was clean.
+A record of a blocked call may carry a fixed `reason` code: `secret-rule`,
+`secret-assignment`, `pii`, `pii-detector-failure`, or
+`infra-failure-closed`. The code names the check
+that stopped the call, never the value, path, or rule text.
+
+The default retention target is 1,000 invocations and seven days. Cleanup runs
+once at invocation start, examines at most 2,000 top-level entries, and only
+removes generated event names. Concurrent runs or externally populated storage
+can exceed that target; cleanup remains bounded. No cleanup runs
+on the signal/exit path. Logging is best-effort and never changes a guard decision.
+`agent-guard logs status` reports
+local log state and `agent-guard logs export` writes the safe metadata JSONL to
+standard output. Neither command exports inspected content, file paths,
+environment values, host session identifiers, or arbitrary tool names.
+
+The same directory holds three local caches. They make repeated hooks faster
+and never stand in for a scan:
+
+- `gitleaks-probe` records, after a successful readiness check, the resolved
+  gitleaks path, that file's identity (device, inode, size, modification and
+  change times), the minimum supported gitleaks version, the time of the check,
+  and the gitleaks version, so invocations within ten minutes can skip
+  rerunning `gitleaks version`. Every invocation still runs its own scan.
+  For ten more minutes the record lets a hook whose `gitleaks version` timed
+  out scan with the recorded version instead of reporting gitleaks as
+  unavailable.
+- `gitleaks-clean/` holds at most 256 entries for repeated Bash command scans
+  that finished clean within the last ten minutes. An entry is named by a
+  SHA-256 of the scanned command text together with the Agent Guard version,
+  the scan flags, the gitleaks path, file identity and version, and the values
+  of `GITLEAKS_CONFIG` and `GITLEAKS_CONFIG_TOML`. It holds a format number, the
+  SHA-256 of the gitleaks configuration file, and the time of the scan. Each
+  `config-<SHA-256>` marker holds only the Agent Guard version and a format
+  number. The scanned text is never stored.
+- `deny-path-regex-<mode>-<key>` files hold the regular expressions built from
+  the protected-path deny list. The name holds the Agent Guard version, the
+  file identity of the deny list and of the `agent-guard` script, and the
+  values of `LC_ALL`, `LC_CTYPE`, and `LANG`. Once more than six pile up for a
+  mode, every file of that mode except the current one is removed.
+
+The caches are used only when the directory path is absolute, contains no
+control characters, is reached without a symlink, and the directory is owned by
+the current user with mode 0700; their files are created with mode 0600. Otherwise each invocation runs without them.
+
+Set `AGENT_GUARD_LOG_MODE=off` to opt out of the log. By default that also
+turns the caches off, so nothing is written to this directory. Every
+invocation then runs the gitleaks readiness check, and a repeated Bash
+command is scanned again: usually one or two more gitleaks runs per hook. To
+keep the caches without the log, set `AGENT_GUARD_SCAN_CACHE=on` explicitly
+as well; the caches above are then written, and no event record is.
+
+## Optional warm gitleaks helper
+
+Used once `agent-guard setup --install` or
+`agent-guard setup --install-gitleaks-helper` has installed it, or
+when `AGENT_GUARD_GITLEAKS_HELPER` names your own build;
+`AGENT_GUARD_GITLEAKS_HELPER=off` keeps it unused. With it, scanned text is sent
+over a private Unix domain socket (a 0700 directory beside the support log,
+socket mode 0600, peer uid checked by the kernel) to one local helper process
+per user and config that outlives a single hook. The helper writes no
+scanned content to disk or logs and makes no network connections; it starts
+with no environment variables. It overwrites its own request buffer after each
+scan, but copies gitleaks keeps as Go strings are freed without being
+overwritten, so scanned bytes can stay in the helper's memory until reused or
+until it exits, about `AGENT_GUARD_GITLEAKS_HELPER_IDLE_SECONDS` (default ten
+minutes, checked every 15 seconds) after the last scan. See
+[the helper guide](https://github.com/JeongJaeSoon/agent-guard/blob/main/docs/gitleaks-helper.md).
+
+## Network behavior
+
+Normal lifecycle hooks and the built-in `regex` PII provider make no outbound
+network calls. Web and MCP tool inputs are inspected locally before the host
+decides whether to execute those tools; Agent Guard does not forward them.
+
+The following explicit actions use the network:
+
+- `agent-guard checksum` fetches the published gitleaks checksum list from
+  GitHub Releases. It sends no project or tool content.
+- Approval-gated `agent-guard setup --install` downloads a versioned gitleaks
+  archive from GitHub Releases and requires its SHA-256. When the gitleaks in
+  use is the one it installs and `AGENT_GUARD_GITLEAKS_HELPER` is not set, it
+  also downloads the warm gitleaks helper archive of the next item. It sends
+  no project or tool content.
+- `agent-guard setup --install-gitleaks-helper` downloads this version's warm
+  gitleaks helper archive for the running platform from this project's GitHub
+  Releases page and installs it only when it matches the SHA-256 values built
+  into the CLI. It sends no project or tool content.
+- The standalone `bootstrap.sh` install path downloads Agent Guard's release
+  archive and checksum from this project's GitHub Releases page.
+  `agent-guard update` first downloads that `bootstrap.sh` from the latest
+  release.
+- `agent-guard doctor`, `agent-guard plugin status`, and `agent-guard plugin
+  update` can send one `HEAD` request to this project's GitHub
+  `releases/latest` URL to learn the newest version. It sends no project or
+  tool content. Set `AGENT_GUARD_RELEASE_CHECK=off` to skip it.
+- `agent-guard plugin install` and `agent-guard plugin update` run the Claude
+  Code or Codex plugin manager, which fetches this project's marketplace from
+  GitHub.
+- If the user selects the experimental `AGENT_GUARD_PII_PROVIDER=http` adapter
+  or the `AGENT_GUARD_PII_PROVIDER=pleno` adapter, `agent-guard pii-filter`
+  sends the complete text provided on stdin to the exact URL in
+  `AGENT_GUARD_PII_REDACT_URL`. In
+  `AGENT_GUARD_PII_HOOK_MODE=block`, supported tool-input text is sent to that
+  same endpoint to determine whether it contains PII, and so is the complete
+  text of every prompt the user submits. A prompt is not a tool input: it
+  carries whatever the user typed or pasted, including material unrelated to
+  the project. The endpoint's operator, not Agent Guard, controls its
+  collection, retention, and deletion practices.
+
+PII hook handling defaults to `off`; the default provider is the local `regex`
+adapter. `mask` mode performs input Tier-2 detection and output masking locally,
+even if an endpoint-backed adapter is configured. Agent Guard never chooses or
+enables a remote PII endpoint on the user's behalf.
+
+## User controls
+
+- Disable or uninstall the plugin to stop all Agent Guard lifecycle hooks.
+- Keep `AGENT_GUARD_PII_HOOK_MODE=off` to disable PII processing in hooks.
+- Use `AGENT_GUARD_PII_PROVIDER=regex` to keep `pii-filter` local.
+- Set `AGENT_GUARD_OUTPUT_REDACT=off` to disable secret-like output masking.
+  This reduces protection and is not recommended.
+- Decline the guided setup installation prompt to prevent software downloads.
+
+For vulnerabilities, use the private channel in [SECURITY.md](SECURITY.md).
+For questions and support, see [SUPPORT.md](SUPPORT.md).
