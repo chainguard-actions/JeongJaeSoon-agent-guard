@@ -1,0 +1,144 @@
+#!/usr/bin/env sh
+set -u
+
+host=${0##*/}
+expected_version=${AG_PLUGIN_TEST_EXPECTED_VERSION:?}
+expected_tag=${AG_PLUGIN_TEST_EXPECTED_TAG:?}
+old_version=${AG_PLUGIN_TEST_OLD_VERSION:?}
+old_tag=${AG_PLUGIN_TEST_OLD_TAG:?}
+printf '%s %s\n' "$host" "$*" >>"$AG_PLUGIN_TEST_LOG"
+
+case "$host:$*" in
+  "${AG_PLUGIN_TEST_FAIL:-__never__}"*) exit 1 ;;
+esac
+
+# Codex app-server: newline-delimited JSON-RPC on stdin/stdout. Replies follow
+# AG_PLUGIN_TEST_TRUST; the hang/linger/spawn modes exercise the deadline and
+# process-group cleanup in the guard.
+if [ "$host" = codex ] && [ "$#" -eq 1 ] && [ "$1" = app-server ]; then
+  trust_mode=${AG_PLUGIN_TEST_TRUST:-trusted}
+  # Before the PID is recorded, so a test that has read it can send TERM.
+  [ "$trust_mode" != hang ] || trap '' TERM
+  [ -z "${AG_PLUGIN_TEST_TRUST_PIDFILE:-}" ] || printf '%s\n' "$$" >>"$AG_PLUGIN_TEST_TRUST_PIDFILE"
+  # A test that ends the guard first holds the server here until it has.
+  while [ -n "${AG_PLUGIN_TEST_TRUST_GATE:-}" ] && [ ! -e "$AG_PLUGIN_TEST_TRUST_GATE" ]; do
+    sleep 0.1
+  done
+  case "$trust_mode" in
+    silent) exit 0 ;;
+    hang) while :; do sleep 1; done ;;
+  esac
+  while IFS= read -r line; do
+    [ -z "${AG_PLUGIN_TEST_TRUST_REQUESTS:-}" ] || printf '%s\n' "$line" >>"$AG_PLUGIN_TEST_TRUST_REQUESTS"
+    case "$line" in
+      *'"method":"initialize"'*)
+        printf '%s\n' '{"jsonrpc":"2.0","method":"remoteControl/status/changed","params":{}}'
+        if [ "$trust_mode" = init-error ]; then
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"rejected"}}'
+        else
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"mock"}}'
+        fi
+        ;;
+      *'"method":"hooks/list"'*)
+        if [ "$trust_mode" = malformed ]; then
+          printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{not-json'
+        else
+          printf '%s' "$line" | jq -c --arg mode "$trust_mode" '
+            def h($e; $t; $on): {key: ("agent-guard@agent-guard:hooks.json:" + $e + ":0:0"),
+              pluginId: "agent-guard@agent-guard", eventName: $e, trustStatus: $t,
+              enabled: $on, source: "plugin"};
+            ["preToolUse", "postToolUse", "sessionStart", "userPromptSubmit", "stop"] as $ev
+            | ($ev | map(h(.; "trusted"; true))) as $ok
+            | {jsonrpc: "2.0", id: 2, result: {data: [{
+                cwd: .params.cwds[0], warnings: [],
+                errors: (if $mode | startswith("errors") then [{message: "invalid hook", path: "/fixture/hooks.json"}] else [] end),
+                hooks: ([{key: "/fixture/.codex/hooks.json:pre_tool_use:0:0", eventName: "preToolUse",
+                          trustStatus: "modified", enabled: true, source: "user"}]
+                  + (if $mode == "managed" then $ev | map(h(.; "managed"; true))
+                     elif $mode == "modified" or $mode == "errors-modified" then $ev | map(h(.; "modified"; true))
+                     elif $mode == "untrusted" then $ev | map(h(.; "untrusted"; true))
+                     elif $mode == "mixed" then
+                       [h("preToolUse"; "trusted"; true), h("postToolUse"; "modified"; true),
+                        h("sessionStart"; "trusted"; true), h("userPromptSubmit"; "trusted"; true),
+                        h("stop"; "untrusted"; true)]
+                     elif $mode == "disabled" then [h("preToolUse"; "trusted"; false)] + $ok[1:]
+                     elif $mode == "missing" then $ok[1:]
+                     elif $mode == "duplicate" then $ok + [$ok[0]]
+                     elif $mode == "none" or $mode == "errors-none" then []
+                     elif $mode == "unknown" then [h("preToolUse"; "pending"; true)] + $ok[1:]
+                     elif $mode == "badtype" then [$ok[0] | .enabled = "yes"] + $ok[1:]
+                     else $ok end))}]}}'
+          # A truncated duplicate after a complete reply must not be skipped.
+          [ "$trust_mode" != corrupt-tail ] \
+            || printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"data":[{"hooks":['
+        fi
+        case "$trust_mode" in
+          linger) trap '' TERM; while :; do sleep 1; done ;;
+          spawn)
+            # Recorded by the parent so the PID exists even if cleanup wins the race.
+            sh -c 'trap "" HUP TERM; exec sleep 30' spawn &
+            printf '%s\n' "$!" >"$AG_PLUGIN_TEST_TRUST_CHILD"
+            ;;
+        esac
+        ;;
+    esac
+  done
+  exit 0
+fi
+
+# Codex 0.153.4 omits Git refs from marketplace-list JSON. Its add command is
+# the read-safe identity probe: the same ref succeeds idempotently, while an
+# existing unpinned or different ref fails without changing manager state.
+if [ "$host:$*" = "codex:plugin marketplace add JeongJaeSoon/agent-guard@$expected_tag" ]; then
+  case "${AG_PLUGIN_TEST_MARKETPLACE:-absent}" in
+    unpinned|old) exit 1 ;;
+  esac
+fi
+
+if [ "${AG_PLUGIN_TEST_SCHEMA:-normal}" = malformed ]; then
+  printf '%s\n' '{not-json'
+  exit 0
+fi
+
+if [ "${AG_PLUGIN_TEST_SCHEMA:-normal}" = drift ]; then
+  case "$1 $2 $3" in
+    'plugin marketplace list') printf '%s\n' '{"sources":[]}' ;;
+    *) printf '%s\n' '{"plugins":[]}' ;;
+  esac
+  exit 0
+fi
+
+if [ "$1 $2 $3" = 'plugin marketplace list' ]; then
+  case "$host:${AG_PLUGIN_TEST_MARKETPLACE:-absent}" in
+    claude:absent) printf '%s\n' '[]' ;;
+    claude:ok) printf '[{"name":"agent-guard","source":"github","repo":"JeongJaeSoon/agent-guard","ref":"%s","installLocation":"/fixture/agent-guard"}]\n' "$expected_tag" ;;
+    claude:unpinned) printf '%s\n' '[{"name":"agent-guard","source":"github","repo":"JeongJaeSoon/agent-guard","installLocation":"/fixture/agent-guard"}]' ;;
+    claude:old) printf '[{"name":"agent-guard","source":"github","repo":"JeongJaeSoon/agent-guard","ref":"%s","installLocation":"/fixture/agent-guard"}]\n' "$old_tag" ;;
+    claude:conflict) printf '%s\n' '[{"name":"agent-guard","repo":"someone/else"}]' ;;
+    codex:absent) printf '%s\n' '{"marketplaces":[]}' ;;
+    codex:ok) printf '%s\n' '{"marketplaces":[{"name":"agent-guard","marketplaceSource":{"sourceType":"git","source":"https://github.com/JeongJaeSoon/agent-guard.git"}}]}' ;;
+    codex:unpinned) printf '%s\n' '{"marketplaces":[{"name":"agent-guard","marketplaceSource":{"sourceType":"git","source":"https://github.com/JeongJaeSoon/agent-guard.git"}}]}' ;;
+    codex:old) printf '%s\n' '{"marketplaces":[{"name":"agent-guard","marketplaceSource":{"sourceType":"git","source":"https://github.com/JeongJaeSoon/agent-guard.git"}}]}' ;;
+    codex:conflict) printf '%s\n' '{"marketplaces":[{"name":"agent-guard","marketplaceSource":{"sourceType":"local","source":"/another/source"}}]}' ;;
+  esac
+  exit 0
+fi
+
+if [ "$1 $2" = 'plugin list' ]; then
+  case "$host:${AG_PLUGIN_TEST_INSTALLED:-0}" in
+    claude:0) printf '%s\n' '[]' ;;
+    claude:1) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"user","enabled":true}]\n' "$expected_version" ;;
+    claude:project) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"project","enabled":true}]\n' "$expected_version" ;;
+    claude:project_old) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"project","enabled":true}]\n' "$old_version" ;;
+    claude:disabled) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"user","enabled":false}]\n' "$expected_version" ;;
+    claude:old) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"user","enabled":true}]\n' "$old_version" ;;
+    claude:managed) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"managed","enabled":true}]\n' "$expected_version" ;;
+    claude:managed_disabled) printf '[{"id":"agent-guard@agent-guard","version":"%s","scope":"managed","enabled":false}]\n' "$expected_version" ;;
+    codex:0) printf '%s\n' '{"installed":[]}' ;;
+    codex:1) printf '{"installed":[{"pluginId":"agent-guard@agent-guard","version":"%s","installed":true,"enabled":true}]}\n' "$expected_version" ;;
+    codex:disabled) printf '{"installed":[{"pluginId":"agent-guard@agent-guard","version":"%s","installed":true,"enabled":false}]}\n' "$expected_version" ;;
+    codex:old) printf '{"installed":[{"pluginId":"agent-guard@agent-guard","version":"%s","installed":true,"enabled":true}]}\n' "$old_version" ;;
+  esac
+fi
+
+exit 0
