@@ -1,0 +1,223 @@
+use crate::common::*;
+use serde_json::json;
+use std::{collections::BTreeSet, path::Path};
+
+pub fn verify(args: &Args) -> Result<()> {
+    let out = std::path::PathBuf::from(args.get("--out")?);
+    std::fs::create_dir_all(&out)?;
+    let out = std::fs::canonicalize(out)?;
+    let core = absolute(args.get("--native-core")?)?;
+    let before = hash(cli()?)?;
+    let shards: Vec<usize> = if let Some(index) = args.values.iter().rposition(|s| s == "--shards")
+    {
+        args.values[index + 1..]
+            .iter()
+            .take_while(|s| !s.starts_with("--"))
+            .map(|s| s.parse())
+            .collect::<std::result::Result<_, _>>()?
+    } else {
+        (1..=5).collect()
+    };
+    ensure(
+        !shards.is_empty() && shards.iter().all(|s| (1..=5).contains(s)),
+        "shards must be 1..5",
+    )?;
+    let mut jobs: Vec<_> = shards.iter().map(|s| (*s, false)).collect();
+    jobs.push((4, true));
+    let mut rows = Vec::new();
+    for pair in jobs.chunks(2) {
+        let result = std::thread::scope(|scope| {
+            let handles:Vec<_>=pair.iter().map(|&(shard,native)| {let core=&core;let out=&out;scope.spawn(move || -> Result<_> {
+                let label=format!("{}-{shard}",if native{"native"}else{"shell"});
+                let env=Env::from([("AGENT_GUARD_TEST_SHARD".into(),shard.to_string()),("AGENT_GUARD_EXPERIMENTAL_REDACTOR".into(),"shell".into()),("AGENT_GUARD_RUST_CORE_BIN".into(),core.clone())]);
+                let log_path=out.join(format!("{label}.log"));
+                let command=vec!["sh".into(),"-c".into(),"log=$1; shift; exec \"$@\" >\"$log\" 2>&1".into(),"verify".into(),log_path.display().to_string(),"sh".into(),if native{"tests/native-suite.sh"}else{"tests/run.sh"}.into()];
+                let (elapsed,result)=invoke(&command,b"",&env,Some(&root()?),3600.0)?;
+                let log=std::fs::read(log_path)?;
+                let text=String::from_utf8_lossy(&log);
+                let summary:Vec<_>=text.lines().filter(|s|["passed:","failed:","not ok -"].iter().any(|prefix|s.starts_with(prefix))).collect();
+                Ok(json!({"label":label,"status":result.status.code().unwrap_or(1),"seconds":elapsed,"summary":summary,"real_scanner_skipped":text.contains("skipped real-gitleaks")}))
+            })}).collect();
+            handles
+                .into_iter()
+                .map(|h| {
+                    h.join()
+                        .map_err(|_| "verification worker panic".into())
+                        .and_then(|r| r)
+                })
+                .collect::<Result<Vec<_>>>()
+        })?;
+        rows.extend(result);
+    }
+    let after = hash(cli()?)?;
+    let report = json!({"before_sha256":before,"after_sha256":after,"stable":before==after,"requested_shell_shards":shards,"results":rows});
+    write_json(out.join("verification.json"), &report)?;
+    emit(&report)?;
+    ensure(
+        before == after && rows.iter().all(|r| r["status"] == 0),
+        "regression verification failed",
+    )
+}
+fn selected_functions(
+    root: &Path,
+    manifest: &serde_json::Map<String, serde_json::Value>,
+) -> Result<tempfile::TempDir> {
+    let dir = tempfile::tempdir()?;
+    let functions = dir.path().join("functions");
+    std::fs::create_dir(&functions)?;
+    let mut command = vec![
+        "sh".into(),
+        root.join("tests/helpers/extract-functions.sh")
+            .display()
+            .to_string(),
+        root.join("plugins/agent-guard/bin/agent-guard")
+            .display()
+            .to_string(),
+        functions.display().to_string(),
+    ];
+    command.extend(manifest.keys().cloned());
+    checked(&command, b"", &Env::new(), None, 30.0)?;
+    Ok(dir)
+}
+
+pub fn refresh_selected_bash(_args: &Args) -> Result<()> {
+    ensure(
+        std::env::var_os("CI").is_none(),
+        "refresh-selected-bash is a manual command; do not run it in CI",
+    )?;
+    let root = root()?;
+    let path = root.join("tests/selected-bash-locations.json");
+    let mut manifest = read_json(&path)?;
+    let entries = manifest.as_object_mut().ok_or("invalid manifest")?;
+    let dir = selected_functions(&root, entries)?;
+    for (name, entry) in entries {
+        ensure(
+            entry["body_sha256"].is_string(),
+            format!("missing body_sha256: {name}"),
+        )?;
+        entry["body_sha256"] = json!(hash(
+            dir.path().join("functions").join(format!("{name}.sh"))
+        )?);
+    }
+    let temporary =
+        tempfile::NamedTempFile::new_in(path.parent().ok_or("missing manifest directory")?)?;
+    let mut bytes = serde_json::to_vec_pretty(&manifest)?;
+    bytes.push(b'\n');
+    std::fs::write(temporary.path(), bytes)?;
+    std::fs::set_permissions(temporary.path(), std::fs::metadata(&path)?.permissions())?;
+    temporary.persist(&path)?;
+    println!(
+        "Updated tests/selected-bash-locations.json; review selected lines before committing."
+    );
+    Ok(())
+}
+
+pub fn selected_bash(_args: &Args) -> Result<()> {
+    let root = root()?;
+    let source = Path::new(&root).join("plugins/agent-guard/bin/agent-guard");
+    let manifest = read_json(root.join("tests/selected-bash-locations.json"))?;
+    let manifest = manifest.as_object().ok_or("invalid manifest")?;
+    let source_text = std::fs::read_to_string(&source)?;
+    let source_lines: Vec<_> = source_text.lines().collect();
+    let dir = selected_functions(&root, manifest)?;
+    let functions = dir.path().join("functions");
+    let mut locations = Vec::new();
+    for (name, entry) in manifest {
+        ensure(
+            json!(hash(functions.join(format!("{name}.sh")))?) == entry["body_sha256"],
+            format!("selected function changed; review denominator: {name}; then run: sh scripts/devtools.sh refresh-selected-bash"),
+        )?;
+        let start = source_lines
+            .iter()
+            .position(|line| *line == format!("{name}() {{"))
+            .ok_or("function not found")?
+            + 1;
+        let lines: Vec<_> = entry["relative_lines"]
+            .as_array()
+            .ok_or("invalid lines")?
+            .iter()
+            .map(|v| {
+                let rel = v.as_u64().unwrap() as usize;
+                (rel, start + rel - 1)
+            })
+            .collect();
+        locations.push((name.clone(), lines));
+    }
+    let collect = |script: &Path| -> Result<(String, BTreeSet<(String, usize)>)> {
+        let trace = dir.path().join("locations");
+        let env = Env::from([
+            ("AG_LOCATION_TRACE".into(), trace.display().to_string()),
+            (
+                "AGENT_GUARD_UNIT_SOURCE".into(),
+                source.display().to_string(),
+            ),
+        ]);
+        let driver="set -T\nexec 9>\"$AG_LOCATION_TRACE\"\ntrap 'printf \"%s:%s\\n\" \"${BASH_SOURCE[0]:-driver}\" \"$LINENO\" >&9' DEBUG\n. \"$0\"\n";
+        let (_, output) = checked(
+            &[
+                "/bin/bash".into(),
+                "-c".into(),
+                driver.into(),
+                script.display().to_string(),
+            ],
+            b"",
+            &env,
+            None,
+            300.0,
+        )?;
+        let mut observed = BTreeSet::new();
+        for event in std::fs::read_to_string(trace)?.lines() {
+            if let Some((path, number)) = event.rsplit_once(':') {
+                let name = Path::new(path)
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                if let Ok(number) = number.parse::<usize>() {
+                    if locations
+                        .iter()
+                        .any(|(n, lines)| *n == name && lines.iter().any(|(rel, _)| *rel == number))
+                    {
+                        observed.insert((name, number));
+                    }
+                }
+            }
+        }
+        Ok((String::from_utf8(output)?, observed))
+    };
+    let mut observed = BTreeSet::new();
+    let mut suites = Vec::new();
+    for suite in [
+        "unit-core.sh",
+        "unit-framing.sh",
+        "unit-deny-path.sh",
+        "unit-probe.sh",
+    ] {
+        let path = root.join("tests").join(suite);
+        let (output, events) = collect(&path)?;
+        observed.extend(events);
+        let counts: Vec<_> = output
+            .lines()
+            .filter(|s| s.starts_with("passed:") || s.starts_with("failed:"))
+            .collect();
+        suites.push(json!({"suite":suite,"counts":counts,"sha256":hash(path)?}));
+    }
+    let control = dir.path().join("definitions-only.sh");
+    let mut definitions = String::new();
+    for name in manifest.keys() {
+        definitions.push_str(&format!(
+            ". \"{}\"\n",
+            functions.join(format!("{name}.sh")).display()
+        ));
+    }
+    std::fs::write(&control, definitions)?;
+    let (_, controls) = collect(&control)?;
+    let rows:Vec<_>=locations.iter().map(|(name,lines)|json!({"function":name,"eligible_source_lines":lines.iter().map(|(_,src)|src).collect::<Vec<_>>(),"observed_source_lines":lines.iter().filter(|(rel,_)|observed.contains(&(name.clone(),*rel))).map(|(_,src)|src).collect::<Vec<_>>(),"missing_source_lines":lines.iter().filter(|(rel,_)|!observed.contains(&(name.clone(),*rel))).map(|(_,src)|src).collect::<Vec<_>>(),"definition_only_source_lines":lines.iter().filter(|(rel,_)|controls.contains(&(name.clone(),*rel))).map(|(_,src)|src).collect::<Vec<_>>()})).collect();
+    emit(
+        &json!({"source_sha256":hash(source)?,"bash":version(&["/bin/bash","--version"])?.lines().next().unwrap(),"denominator":locations.iter().map(|(_,lines)|lines.len()).sum::<usize>(),"observed":observed.len(),"definition_only_observed":controls.len(),"suites":suites,"functions":rows}),
+    )?;
+    ensure(
+        controls.is_empty(),
+        "definition-only control unexpectedly reached selected locations",
+    )
+}
