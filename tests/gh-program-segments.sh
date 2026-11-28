@@ -1,0 +1,75 @@
+#!/usr/bin/env sh
+# Synthetic hook inputs only: none of the fixture commands is executed.
+# The --jq, -q, --template and -t value of a gh query at a command position
+# in any segment, or in a loop or condition body, is read as program text, as
+# long as nothing in the command can change which gh runs. --input files,
+# -F field=@file values, path arguments and redirects stay in the
+# protected-path scan. A row may set path_prefix, a relative PATH entry put in
+# front of PATH for that row.
+# Every row runs in Claude's native event shape. The host changes the block
+# message and the output envelope, never the decision, and no row here depends
+# on where the event carries the working directory. So only the rows marked
+# "both_hosts", one that passes and one that blocks, also run in Codex's shape.
+set -u
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+GUARD=${AGENT_GUARD_TEST_BINARY:-$ROOT/plugins/agent-guard/bin/agent-guard}
+FIXTURE=${AGENT_GUARD_TEST_FIXTURE:-$ROOT/tests/fixtures/gh-program-segments.json}
+CASE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/agent-guard-gh-segments.XXXXXX") || exit 1
+trap 'rm -rf "$CASE_ROOT"' EXIT HUP INT TERM
+export HOME="$CASE_ROOT/home" AGENT_GUARD_LOG_MODE=off AGENT_GUARD_RELEASE_CHECK=off
+export AGENT_GUARD_GITLEAKS_BIN="$ROOT/tests/fixtures/mock-gitleaks"
+mkdir -p "$HOME" "$CASE_ROOT/work"
+failed=0
+checked=0
+jq -e 'type == "array" and length > 0' "$FIXTURE" >/dev/null || {
+  printf 'not ok - %s is not a non-empty array\n' "$FIXTURE"
+  exit 1
+}
+jq -e 'all(.[]; (has("both_hosts") | not) or (.both_hosts | type == "boolean"))' "$FIXTURE" >/dev/null || {
+  printf 'not ok - %s: both_hosts must be true or false where a row sets it\n' "$FIXTURE"
+  exit 1
+}
+# The bundled fixture keeps rows for Codex; one given through
+# AGENT_GUARD_TEST_FIXTURE may hold a single row.
+if [ -z "${AGENT_GUARD_TEST_FIXTURE:-}" ]; then
+  jq -e 'any(.[]; .both_hosts == true and .expected_status == 0)
+         and any(.[]; .both_hosts == true and .expected_status == 2)' "$FIXTURE" >/dev/null || {
+    printf 'not ok - %s needs a both_hosts row that passes and one that blocks\n' "$FIXTURE"
+    exit 1
+  }
+fi
+jq -c '.[]' "$FIXTURE" >"$CASE_ROOT/cases" || exit 1
+while IFS= read -r row; do
+  expected=$(printf '%s' "$row" | jq -r '.expected_status')
+  prefix=$(printf '%s' "$row" | jq -r '.path_prefix // empty')
+  name=$(printf '%s' "$row" | jq -r '.id + " (" + .classification + "): " + .description')
+  # An empty host list would skip the row without a failure.
+  hosts=$(printf '%s' "$row" | jq -r 'if .both_hosts == true then "claude codex" else "claude" end') \
+    && [ -n "$hosts" ] || {
+      printf 'not ok - %s: cannot read which hosts run the row\n' "$name"
+      exit 1
+    }
+  for host in $hosts; do
+    case "$host" in
+      codex) shape='{tool_name:"Bash",tool_input:{command:.command,workdir:$d}}' ;;
+      *) shape='{hook_event_name:"PreToolUse",tool_name:"Bash",tool_input:{command:.command},cwd:$d}' ;;
+    esac
+    checked=$((checked + 1))
+    printf '%s' "$row" | jq -c --arg d "$CASE_ROOT/work" "$shape" \
+      | PATH="${prefix:+$prefix:}$PATH" AGENT_GUARD_HOOK_HOST=$host "$GUARD" hook-pre-tool >"$CASE_ROOT/out" 2>"$CASE_ROOT/err"
+    status=$?
+    # A shell error in the hook exits 0 under the default infrastructure
+    # policy, so a must-pass row also needs a clean stderr.
+    if [ "$status" -eq "$expected" ] \
+      && ! grep -Eq 'unbound variable|syntax error|not found|line [0-9]+:' "$CASE_ROOT/err" \
+      && { [ "$expected" -eq 0 ] || grep -Fq 'reason=bash_protected_path_text_match' "$CASE_ROOT/err"; }; then
+      printf 'ok - [%s] %s\n' "$host" "$name"
+    else
+      printf 'not ok - [%s] %s: expected %s got %s\n' "$host" "$name" "$expected" "$status"
+      sed 's/^/#   /' "$CASE_ROOT/err"
+      failed=$((failed + 1))
+    fi
+  done
+done <"$CASE_ROOT/cases"
+printf '%s gh program segment checks, %s failed\n' "$checked" "$failed"
+[ "$failed" -eq 0 ]
